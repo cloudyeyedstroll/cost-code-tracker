@@ -24,7 +24,7 @@ A mobile-first, production-ready Construction Job Costing application designed t
 - **Cloud Config Fallbacks:** Implemented robust configuration parsing in `database.py` to seamlessly fallback to `st.secrets` when cloud environment variables are unavailable, preventing deployment crashes.
 
 ### 3. Mobile-First Field Logging
-- **Shift Duration & Allocation:** Field workers now log explicit Shift Start and End Times. The app auto-calculates total shift duration and strictly enforces a multi-step allocation UI, allowing workers to split their shift across up to 3 cost codes.
+- **Dynamic Shift Allocation:** Field workers now log explicit Shift Start and End Times. The app auto-calculates total shift duration and strictly enforces a multi-step allocation UI. We replaced the fixed 3-slot limit with a dynamic form structure that allows adding unlimited cost code allocations using a responsive "➕ Add Another Cost Code" button.
 - **Validation Gates:** Forms are protected by strict validations, showing clear errors and blocking submission if allocated hours do not match the calculated shift duration.
 - **Responsive Layout:** Changed the Streamlit layout to "centered" to prevent horizontal stretching on small screens.
 - **Improved Navigation:** Replaced horizontal tabs with a `st.selectbox` for toggling between views.

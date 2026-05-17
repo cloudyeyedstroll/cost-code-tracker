@@ -133,87 +133,105 @@ else:
         projects_df = db.get_projects()
         cost_codes_df = db.get_cost_codes()
         
-        with st.form("log_form", clear_on_submit=True):
-            log_date = st.date_input("Date", datetime.date.today())
+        if 'form_reset_key' not in st.session_state:
+            st.session_state.form_reset_key = 0
+        if 'alloc_count' not in st.session_state:
+            st.session_state.alloc_count = 1
+
+        prefix = f"fk_{st.session_state.form_reset_key}_"
+        
+        log_date = st.date_input("Date", datetime.date.today(), key=f"{prefix}date")
+        
+        project_options = dict(zip(projects_df['project_name'], projects_df['id']))
+        selected_project = st.selectbox("Project", list(project_options.keys()), key=f"{prefix}proj")
+        
+        cost_code_options = dict(zip(cost_codes_df['display_name'], cost_codes_df['id']))
+        
+        if log_type == "Labor":
+            st.subheader("Step 1: Shift Time Entry")
+            col1, col2 = st.columns(2)
+            with col1:
+                start_time = st.time_input("Shift Start Time", datetime.time(7, 0), key=f"{prefix}start")
+            with col2:
+                end_time = st.time_input("Shift End Time", datetime.time(15, 0), key=f"{prefix}end")
             
-            project_options = dict(zip(projects_df['project_name'], projects_df['id']))
-            selected_project = st.selectbox("Project", list(project_options.keys()))
+            took_lunch = st.checkbox("Did you take a lunch? (Deducts 0.5 hrs)", value=False, key=f"{prefix}lunch")
             
-            cost_code_options = dict(zip(cost_codes_df['display_name'], cost_codes_df['id']))
+            # Calculate duration
+            start_dt = datetime.datetime.combine(datetime.date.today(), start_time)
+            end_dt = datetime.datetime.combine(datetime.date.today(), end_time)
+            if end_dt <= start_dt:
+                end_dt += datetime.timedelta(days=1)
+            
+            shift_duration = (end_dt - start_dt).total_seconds() / 3600.0
+            if took_lunch:
+                shift_duration = max(0.0, shift_duration - 0.5)
+            
+            st.info(f"**Calculated Shift Duration:** {shift_duration:.2f} hours")
+            
+            st.subheader("Step 2: Cost Code Allocation")
+            st.markdown("Allocate your shift hours across multiple cost codes.")
+            
+            allocations = []
+            for i in range(st.session_state.alloc_count):
+                st.markdown(f"**Allocation {i+1}**")
+                c1, c2 = st.columns([2, 1])
+                with c1:
+                    selected_cc = st.selectbox(f"Cost Code", list(cost_code_options.keys()), key=f"{prefix}cc_{i}")
+                with c2:
+                    alloc_hours = st.number_input(f"Hours", min_value=0.0, step=0.5, value=0.0, key=f"{prefix}hrs_{i}")
+                alloc_desc = st.text_input(f"Work Description (Optional)", key=f"{prefix}desc_{i}")
+                allocations.append({
+                    "cost_code": selected_cc,
+                    "hours": alloc_hours,
+                    "description": alloc_desc
+                })
+                st.markdown("---")
+            
+            if st.button("➕ Add Another Cost Code"):
+                st.session_state.alloc_count += 1
+                st.rerun()
+                
+        else:
+            selected_cost_code = st.selectbox("Cost Code", list(cost_code_options.keys()), key=f"{prefix}eq_cc")
+            equipment_df = db.get_equipment()
+            equipment_options = dict(zip(equipment_df['display_name'], equipment_df['id']))
+            selected_equipment = st.selectbox("Equipment", list(equipment_options.keys()), key=f"{prefix}eq_sel")
+            hours = st.number_input("Hours Used", min_value=0.5, step=0.5, value=8.0, key=f"{prefix}eq_hrs")
+            
+        submit = st.button("Log Hours", type="primary", use_container_width=True)
+        
+        if submit:
+            project_id = project_options[selected_project]
             
             if log_type == "Labor":
-                st.subheader("Step 1: Shift Time Entry")
-                col1, col2 = st.columns(2)
-                with col1:
-                    start_time = st.time_input("Shift Start Time", datetime.time(7, 0))
-                with col2:
-                    end_time = st.time_input("Shift End Time", datetime.time(15, 0))
+                total_allocated = sum(alloc["hours"] for alloc in allocations)
                 
-                took_lunch = st.checkbox("Did you take a lunch? (Deducts 0.5 hrs)", value=False)
-                
-                # Calculate duration
-                start_dt = datetime.datetime.combine(datetime.date.today(), start_time)
-                end_dt = datetime.datetime.combine(datetime.date.today(), end_time)
-                if end_dt <= start_dt:
-                    end_dt += datetime.timedelta(days=1)
-                
-                shift_duration = (end_dt - start_dt).total_seconds() / 3600.0
-                if took_lunch:
-                    shift_duration = max(0.0, shift_duration - 0.5)
-                
-                st.info(f"**Calculated Shift Duration:** {shift_duration:.2f} hours")
-                
-                st.subheader("Step 2: Cost Code Allocation")
-                st.markdown("Allocate your shift hours across up to 3 cost codes.")
-                
-                allocations = []
-                for i in range(3):
-                    st.markdown(f"**Allocation {i+1}**")
-                    c1, c2 = st.columns([2, 1])
-                    with c1:
-                        selected_cc = st.selectbox(f"Cost Code", list(cost_code_options.keys()), key=f"cc_{i}")
-                    with c2:
-                        alloc_hours = st.number_input(f"Hours", min_value=0.0, step=0.5, value=0.0, key=f"hrs_{i}")
-                    alloc_desc = st.text_input(f"Work Description (Optional)", key=f"desc_{i}")
-                    allocations.append({
-                        "cost_code": selected_cc,
-                        "hours": alloc_hours,
-                        "description": alloc_desc
-                    })
-                    st.markdown("---")
-            else:
-                selected_cost_code = st.selectbox("Cost Code", list(cost_code_options.keys()))
-                equipment_df = db.get_equipment()
-                equipment_options = dict(zip(equipment_df['display_name'], equipment_df['id']))
-                selected_equipment = st.selectbox("Equipment", list(equipment_options.keys()))
-                hours = st.number_input("Hours Used", min_value=0.5, step=0.5, value=8.0)
-                
-            submit = st.form_submit_button("Log Hours", use_container_width=True)
-            
-            if submit:
-                project_id = project_options[selected_project]
-                
-                if log_type == "Labor":
-                    total_allocated = sum(alloc["hours"] for alloc in allocations)
-                    
-                    if total_allocated == 0:
-                        st.error("⚠️ Allocation Error: Total allocated hours cannot be 0.")
-                    elif total_allocated != shift_duration:
-                        st.error(f"⚠️ Allocation Error: Your allocated hours ({total_allocated} hrs) do not match your total shift duration ({shift_duration} hrs).")
-                    else:
-                        start_time_str = start_time.strftime("%H:%M")
-                        end_time_str = end_time.strftime("%H:%M")
-                        
-                        for alloc in allocations:
-                            if alloc["hours"] > 0:
-                                cost_code_id = cost_code_options[alloc["cost_code"]]
-                                db.log_labor(log_date, project_id, st.session_state.logged_in_user_id, cost_code_id, alloc["hours"], alloc["description"], start_time_str, end_time_str)
-                        st.success(f"Successfully logged {total_allocated} labor hours.")
+                if total_allocated == 0:
+                    st.error("⚠️ Allocation Error: Total allocated hours cannot be 0.")
+                elif total_allocated != shift_duration:
+                    st.error(f"⚠️ Allocation Error: Your allocated hours ({total_allocated} hrs) do not match your total shift duration ({shift_duration} hrs).")
                 else:
-                    cost_code_id = cost_code_options[selected_cost_code]
-                    eq_id = equipment_options[selected_equipment]
-                    db.log_equipment(log_date, project_id, st.session_state.logged_in_user_id, eq_id, cost_code_id, hours)
-                    st.success(f"Successfully logged {hours} equipment hours for {selected_equipment}.")
+                    start_time_str = start_time.strftime("%H:%M")
+                    end_time_str = end_time.strftime("%H:%M")
+                    
+                    for alloc in allocations:
+                        if alloc["hours"] > 0:
+                            cost_code_id = cost_code_options[alloc["cost_code"]]
+                            db.log_labor(log_date, project_id, st.session_state.logged_in_user_id, cost_code_id, alloc["hours"], alloc["description"], start_time_str, end_time_str)
+                    
+                    st.success(f"Successfully logged {total_allocated} labor hours.")
+                    st.session_state.alloc_count = 1
+                    st.session_state.form_reset_key += 1
+                    st.rerun()
+            else:
+                cost_code_id = cost_code_options[selected_cost_code]
+                eq_id = equipment_options[selected_equipment]
+                db.log_equipment(log_date, project_id, st.session_state.logged_in_user_id, eq_id, cost_code_id, hours)
+                st.success(f"Successfully logged {hours} equipment hours for {selected_equipment}.")
+                st.session_state.alloc_count = 1
+                st.session_state.form_reset_key += 1
+                st.rerun()
 
     elif view == "Foreman Review":
         st.header("Foreman Review")

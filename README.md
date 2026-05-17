@@ -6,7 +6,7 @@ A mobile-first, production-ready application designed to streamline field labor 
 
 ### 📱 Mobile-First Field Logging
 - **Shift-Based Time Cards:** Workers log precise Shift Start and End Times with optional lunch deductions. The system auto-calculates total shift duration.
-- **Validated Cost Allocation:** Shift hours can be split across up to 3 independent cost codes. Strict server-side validation ensures that the sum of allocated hours exactly matches the total shift duration, preventing bad data from entering payroll.
+- **Validated Cost Allocation:** Shift hours can be split across an unlimited number of independent cost codes using a dynamic allocation flow. Strict server-side validation ensures that the sum of allocated hours exactly matches the total shift duration, preventing bad data from entering payroll.
 - **Equipment Tracking:** Log exact machinery (Make, Model, and Unit Number) to accurately track asset utilization alongside labor.
 - **Optimized UI:** High-contrast, large-touch-target interface tailored for outdoor visibility and ease of use on mobile devices.
 
