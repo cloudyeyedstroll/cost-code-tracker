@@ -17,6 +17,7 @@ A mobile-first, production-ready application designed to streamline field labor 
 ### 💼 Office Dashboard & Live Costing
 - **Real-Time Financials:** Live calculation of "Total Labor Cost ($)" and "Total Equipment Cost ($)" based on underlying hourly wage and machine charge-out rates.
 - **Automated Aggregation:** Daily summaries automatically group hours by cost code and equipment assets.
+- **Project & Job Management:** Intuitive creation interface for Admins to instantly deploy new projects and job sites directly to field crew time cards.
 - **Force Account & T&M Tickets:** Dedicated interface for generating and reviewing Time & Material tickets (Cost Code 99-000) equipped with digital signature captures rendering securely on the dashboard.
 - **One-Click Exports:** Export labor and equipment reports directly to CSV to streamline invoicing, payroll, and bidding workflows.
 

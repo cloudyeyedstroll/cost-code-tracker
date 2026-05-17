@@ -482,3 +482,22 @@ else:
                         st.rerun()
                     else:
                         st.error(message)
+
+        with st.expander("🏗️ Project & Job Management"):
+            with st.form("add_project_form"):
+                new_project_name = st.text_input("Project / Job Name (e.g., Fern Street Sidewalks)")
+                new_project_location = st.text_input("Project Location / Town (e.g., Chilliwack, BC)")
+                add_proj_submit = st.form_submit_button("CREATE NEW PROJECT", use_container_width=True)
+                
+                if add_proj_submit:
+                    if not new_project_name or not new_project_location:
+                        st.error("Project Name and Location are required.")
+                    else:
+                        success, msg = db.add_project(new_project_name, new_project_location)
+                        if success:
+                            st.toast("🏗️ New project successfully initialized and pushed live to field crews!")
+                            import time; time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.error(f"Failed to create project: {msg}")
+

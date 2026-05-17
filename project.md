@@ -36,6 +36,7 @@ A mobile-first, production-ready Construction Job Costing application designed t
 - **Data Summaries:** Created SQL queries to aggregate daily labor and equipment hours.
 - **Asset Tracking:** Refined equipment summary queries to track and display specific machinery (Unit Number & Make/Model) alongside aggregate cost code hours.
 - **Data Export:** Integrated one-click CSV export functionality for both labor and equipment reports to streamline billing workflows.
+- **Project & Job Management:** Added an intuitive, dynamic project creation interface allowing administrators to instantly spin up and deploy new jobs to field crews directly from the Office Dashboard without backend migrations.
 - **Force Account Sign-off (T&M):** Deployed a dedicated view for Foremen/Admins to generate Time & Material tickets (Cost Code 99-000), complete with digital signature capture via `streamlit-drawable-canvas`. Signed tickets render seamlessly on the Office Dashboard.
 
 ---

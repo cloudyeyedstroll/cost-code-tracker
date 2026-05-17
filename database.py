@@ -66,6 +66,18 @@ def get_projects():
     response = supabase.table('projects').select('id, project_name').execute()
     return pd.DataFrame(response.data) if response.data else pd.DataFrame(columns=['id', 'project_name'])
 
+def add_project(project_name, location):
+    try:
+        supabase.table('projects').insert({
+            "project_name": project_name,
+            "location": location,
+            "procore_id": None
+        }).execute()
+        return True, "Project added successfully."
+    except Exception as e:
+        print(f"Error adding project: {e}")
+        return False, str(e)
+
 def get_employees():
     response = supabase.table('employees').select('id, first_name, last_name, role').execute()
     df = pd.DataFrame(response.data) if response.data else pd.DataFrame(columns=['id', 'first_name', 'last_name', 'role'])
