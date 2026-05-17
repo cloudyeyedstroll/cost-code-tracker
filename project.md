@@ -17,6 +17,7 @@ A mobile-first, production-ready Construction Job Costing application designed t
 ### 2. Security & User Flow
 - **Supabase Auth:** Integrated secure, email/password-based authentication with onboarding activation links. Added secure Invite Token logic for standardizing new employee rollouts.
 - **Automated Email Invitations:** Implemented Supabase's native GoTrue Admin Auth invite system. Triggers branded cloud-managed emails securely via the `supabase_admin` client. Solves Streamlit URL hash limitations via a secure `token_hash` query parameter intercept block that seamlessly authenticates and activates new users.
+- **Bulletproof Environment Configuration:** Upgraded the configuration loader with `dotenv_values` and `find_dotenv()` to bypass Streamlit working directory caching issues, ensuring production credentials and database connections initialize flawlessly across all environments.
 - **Session State Management:** Maintained active login states using Streamlit's session state, ensuring workers can only log hours under their authenticated profile to prevent data entry errors.
 - **Role-Based Navigation:** The application dynamically adjusts navigation, granting foremen an exclusive "Foreman Review" view to bulk-approve pending logs.
 - **Admin Management:** Introduced strict administrative controls for permanently deleting employee records (with log conflict validation) and updating roles.

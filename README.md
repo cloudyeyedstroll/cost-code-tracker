@@ -32,11 +32,12 @@ A mobile-first, production-ready application designed to streamline field labor 
 - **Digital Signatures:** `streamlit-drawable-canvas`
 - **Database & Auth:** [Supabase](https://supabase.com/) (PostgreSQL)
 - **Data Manipulation:** Pandas
+- **Environment Management:** `python-dotenv` (robust parsing across CLI entrypoints)
+- **Cloud Infrastructure:** Google Cloud Run (Containerized Deployment)
 
 ## 🔮 Future Roadmap
 - **Procore API Integration:** Bidirectional syncing of Projects, Cost Codes, and Employees directly with Procore.
 - **Advanced Analytics:** Adding date range pickers and preset filters to the Office Dashboard.
-- **Production Deployment:** Hosting on Google Cloud Run or Vercel for widespread crew access.
 
 ## 🏃‍♂️ Getting Started
 
