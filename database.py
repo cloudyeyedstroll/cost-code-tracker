@@ -298,6 +298,7 @@ def verify_employee_login(email, password):
                 }
     except Exception as e:
         print(f"Login error: {e}")
+        return {"error": str(e)}
     return None
 
 def get_unsigned_tm_logs(project_id):

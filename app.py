@@ -96,12 +96,16 @@ if st.session_state.logged_in_user_id is None:
         submit = st.form_submit_button("LOG IN", use_container_width=True)
         
         if submit:
-            emp_data = db.verify_employee_login(email, password)
+            clean_email = email.strip()
+            emp_data = db.verify_employee_login(clean_email, password)
             if emp_data:
-                st.session_state.logged_in_user_id = emp_data["id"]
-                st.session_state.logged_in_user_name = emp_data["full_name"]
-                st.session_state.logged_in_user_role = emp_data["role"]
-                st.rerun()
+                if "error" in emp_data:
+                    st.error(f"System Error: {emp_data['error']}")
+                else:
+                    st.session_state.logged_in_user_id = emp_data["id"]
+                    st.session_state.logged_in_user_name = emp_data["full_name"]
+                    st.session_state.logged_in_user_role = emp_data["role"]
+                    st.rerun()
             else:
                 st.error("Incorrect Email or Password. Please try again.")
 
