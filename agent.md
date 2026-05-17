@@ -19,6 +19,12 @@ Open and edit 'README.md' to keep the client-facing specification fresh:
 - **Feature Alignments:** Ensure the "🚀 Key Features" summaries reflect the most recent production capabilities (such as shifting authentication mechanisms, layout responsiveness, or workflow review states).
 - **Stack & Roadmap Cleanliness:** Update the "🛠️ Technology Stack" list if new python packages or libraries are introduced, and purge the "🔮 Future Roadmap" of completed achievements.
 
+### Step C: Deployment & Cloud Run Environment Protocol
+With every code update or feature completion, you MUST:
+1. **Push & Redeploy:** Commit your changes, push to the remote repository, and redeploy the application to Google Cloud Run.
+2. **Inject Environment Variables:** Ensure that environment variables (`SUPABASE_URL`, `SUPABASE_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`) are securely and natively injected into the Cloud Run service configuration (e.g., using `gcloud run services update ... --update-env-vars ...`). 
+   - *Why?* The local `.env` file is blocked by `.dockerignore` for security. Uploading code or deploying a local folder directly to Cloud Run will spin up the container without these credentials, causing "Database client not initialized" errors unless they are explicitly injected into the service.
+
 ## 3. Enforcement Gate
 - Do not mark an issue or user prompt as "Complete" until both 'project.md' and 'README.md' have been modified, saved, and structurally audited for markdown formatting errors.
 - At the start of every new user prompt or sub-task iteration, read this file ('agent.md') first to ground your operational workflow requirements.
