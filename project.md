@@ -12,6 +12,7 @@ A mobile-first, production-ready Construction Job Costing application designed t
 - Included `start_time` and `end_time` to labor logs to capture explicit shift durations.
 - Prepared schema for future integrations by including `procore_id` fields in relevant tables.
 - **Force Account Architecture:** Added a dedicated schema structure for grouping T&M logs to signed tickets, executing schema migration `20260517000000_force_accounts.sql`.
+- **Dynamic Job Titles:** Replaced hardcoded roles with a dynamic, database-driven `job_titles` table mapped to core permission tiers (Admin, Foreman, Crew). Admins can create and assign custom job titles through the Office Dashboard.
 
 ### 2. Security & User Flow
 - **Supabase Auth:** Integrated secure, email/password-based authentication with onboarding activation links. Added secure Invite Token logic for standardizing new employee rollouts.

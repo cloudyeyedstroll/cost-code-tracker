@@ -371,11 +371,37 @@ else:
             
             
         with st.expander("⚙️ Employee Permissions & Administration"):
+            job_titles_df = db.get_all_job_titles()
+            job_title_options = job_titles_df['title_name'].tolist() if not job_titles_df.empty else ["Crew", "Foreman", "Admin"]
+            
+            st.markdown("### ✨ Manage Custom Job Titles")
+            with st.form("add_job_title_form"):
+                col1, col2 = st.columns(2)
+                with col1:
+                    new_title_name = st.text_input("Custom Job Title (e.g. Project Manager)")
+                with col2:
+                    new_title_tier = st.selectbox("Permission Tier", ["Crew", "Foreman", "Admin"])
+                
+                add_title_submit = st.form_submit_button("CREATE JOB TITLE", use_container_width=True)
+                if add_title_submit:
+                    if not new_title_name:
+                        st.error("Job title is required.")
+                    else:
+                        success, msg = db.add_custom_job_title(new_title_name, new_title_tier)
+                        if success:
+                            st.toast(f"Successfully created '{new_title_name}'!")
+                            import time; time.sleep(0.5)
+                            st.rerun()
+                        else:
+                            st.error(f"Failed to create job title: {msg}")
+            
+            st.divider()
+
             st.markdown("### Update Existing Permissions")
             admin_emps_df = db.get_employees()
             admin_emp_options = dict(zip(admin_emps_df['full_name'], admin_emps_df['id']))
             selected_admin_emp = st.selectbox("Select Employee", list(admin_emp_options.keys()), key="update_emp")
-            new_role = st.selectbox("Assign Role", ["Crew", "Foreman", "Admin"], key="update_role")
+            new_role = st.selectbox("Assign Job Title", job_title_options, key="update_role")
             
             if st.button("Update Permissions"):
                 emp_id_to_update = admin_emp_options[selected_admin_emp]
@@ -391,7 +417,7 @@ else:
                 new_first_name = st.text_input("First Name")
                 new_last_name = st.text_input("Last Name")
                 new_emp_email = st.text_input("Email Address")
-                new_emp_role = st.selectbox("System Access Role", ["Crew", "Foreman", "Admin"])
+                new_emp_role = st.selectbox("System Access Role (Job Title)", job_title_options)
                 add_emp_submit = st.form_submit_button("ADD EMPLOYEE TO SYSTEM", use_container_width=True)
                 
                 if add_emp_submit:

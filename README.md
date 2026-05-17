@@ -22,6 +22,7 @@ A mobile-first, production-ready application designed to streamline field labor 
 
 ### 🔒 Security & Data Integrity
 - **Secure Authentication:** Robust integration with Supabase Auth using email, passwords, and secure activation links.
+- **Dynamic Job Titles:** Create and manage custom job titles that map securely to system permission tiers (Admin, Foreman, Crew).
 - **Session Management:** Prevents data entry mix-ups by strictly tying logged hours to the currently authenticated user profile.
 - **Supabase Database:** Hosted PostgreSQL ensuring fully relational, highly-available cloud data persistence.
 

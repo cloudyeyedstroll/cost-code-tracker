@@ -64,6 +64,20 @@ def get_cost_codes():
         df['display_name'] = df['code_number'] + ' ' + df['description']
     return df
 
+def get_all_job_titles():
+    response = supabase.table('job_titles').select('id, title_name, permission_tier').execute()
+    return pd.DataFrame(response.data) if response.data else pd.DataFrame(columns=['id', 'title_name', 'permission_tier'])
+
+def add_custom_job_title(title_name, permission_tier):
+    try:
+        supabase.table('job_titles').insert({
+            "title_name": title_name,
+            "permission_tier": permission_tier
+        }).execute()
+        return True, "Job title added successfully."
+    except Exception as e:
+        return False, str(e)
+
 def log_labor(date, project_id, employee_id, cost_code_id, hours_worked, work_description="", start_time="", end_time=""):
     supabase.table('labor_logs').insert({
         "date": str(date),
@@ -241,16 +255,21 @@ def verify_employee_login(email, password):
         # Authenticate with Supabase Auth
         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
         if res.session:
-            # Fetch user details from public.employees
             emp_res = supabase.table('employees').select('id, first_name, last_name, role, account_status').eq('email', email).execute()
             if emp_res.data and emp_res.data[0]['account_status'] == 'Active':
                 emp = emp_res.data[0]
+                
+                # Resolve permission tier from job_titles table
+                job_title_res = supabase.table('job_titles').select('permission_tier').eq('title_name', emp['role']).execute()
+                permission_tier = job_title_res.data[0]['permission_tier'] if job_title_res.data else 'Crew'
+                
                 return {
                     "id": emp['id'], 
                     "first_name": emp['first_name'], 
                     "last_name": emp['last_name'], 
-                    "role": emp['role'], 
-                    "full_name": f"{emp['first_name']} {emp['last_name']}"
+                    "role": permission_tier, 
+                    "full_name": f"{emp['first_name']} {emp['last_name']}",
+                    "job_title": emp['role']
                 }
     except Exception as e:
         print(f"Login error: {e}")
