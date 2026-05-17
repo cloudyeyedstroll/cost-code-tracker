@@ -1,14 +1,32 @@
 import pandas as pd
 import os
+import streamlit as st
 from supabase import create_client, Client
 from dotenv import load_dotenv
 import secrets
 
 load_dotenv()
 
+# Check os.environ first, fallback to st.secrets for Streamlit Cloud deployments
 url: str = os.environ.get("SUPABASE_URL")
+if not url:
+    try:
+        url = st.secrets["SUPABASE_URL"]
+    except Exception:
+        pass
+
 key: str = os.environ.get("SUPABASE_KEY")
-supabase: Client = create_client(url, key)
+if not key:
+    try:
+        key = st.secrets["SUPABASE_KEY"]
+    except Exception:
+        pass
+
+try:
+    supabase: Client = create_client(url, key)
+except Exception as e:
+    print(f"Failed to initialize Supabase client: {e}")
+    supabase = None
 
 def setup():
     # Supabase handles its own schema, so setup is a no-op locally.
@@ -95,7 +113,8 @@ def create_employee_invite(first_name, last_name, email, role, token=None):
             "email": email,
             "account_status": "Pending",
             "role": role,
-            "auth_id": auth_id
+            "auth_id": auth_id,
+            "invite_token": temp_password
         }).execute()
         return temp_password
     except Exception as e:
@@ -236,4 +255,55 @@ def verify_employee_login(email, password):
     except Exception as e:
         print(f"Login error: {e}")
     return None
+
+def get_unsigned_tm_logs(project_id):
+    # Fetch 99-000 Cost Code ID
+    cc_res = supabase.table('cost_codes').select('id').eq('code_number', '99-000').execute()
+    if not cc_res.data:
+        return [], []
+    cc_id = cc_res.data[0]['id']
+    
+    # Fetch labor logs
+    l_res = supabase.table('labor_logs').select('id, date, hours_worked, work_description, employee_id').eq('project_id', project_id).eq('cost_code_id', cc_id).eq('status', 'Approved').is_('force_account_id', 'null').execute()
+    l_data = l_res.data if l_res.data else []
+    if l_data:
+        emps = {e['id']: f"{e['first_name']} {e['last_name']}" for e in supabase.table('employees').select('id, first_name, last_name').execute().data}
+        for log in l_data:
+            log['worker_name'] = emps.get(log['employee_id'], 'Unknown')
+            
+    # Fetch equipment logs
+    eq_res = supabase.table('equipment_logs').select('id, date, hours_used, equipment_id').eq('project_id', project_id).eq('cost_code_id', cc_id).eq('status', 'Approved').is_('force_account_id', 'null').execute()
+    eq_data = eq_res.data if eq_res.data else []
+    if eq_data:
+        eqs = {e['id']: f"{e['unit_number']} - {e['make_model']}" for e in supabase.table('equipment').select('id, unit_number, make_model').execute().data}
+        for log in eq_data:
+            log['equipment_name'] = eqs.get(log['equipment_id'], 'Unknown')
+            
+    return l_data, eq_data
+
+def create_force_account(project_id, client_name, signature_b64, labor_ids, equipment_ids):
+    res = supabase.table('force_accounts').insert({
+        "project_id": project_id,
+        "client_representative": client_name,
+        "signature_data": signature_b64
+    }).execute()
+    fa_id = res.data[0]['id']
+    
+    if labor_ids:
+        for lid in labor_ids:
+            supabase.table('labor_logs').update({"force_account_id": fa_id}).eq('id', lid).execute()
+    if equipment_ids:
+        for eid in equipment_ids:
+            supabase.table('equipment_logs').update({"force_account_id": fa_id}).eq('id', eid).execute()
+
+def get_signed_force_accounts():
+    res = supabase.table('force_accounts').select('*').order('date', desc=True).execute()
+    if not res.data:
+        return pd.DataFrame()
+    
+    df = pd.DataFrame(res.data)
+    projs = pd.DataFrame(supabase.table('projects').select('id, project_name').execute().data)
+    df = df.merge(projs, left_on='project_id', right_on='id', suffixes=('', '_p'))
+    df['Project'] = df['project_name']
+    return df
 

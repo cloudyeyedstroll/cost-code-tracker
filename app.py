@@ -2,6 +2,8 @@ import streamlit as st
 import datetime
 import database as db
 import secrets
+from streamlit_drawable_canvas import st_canvas
+import base64
 
 st.set_page_config(page_title="Construction Job Costing", layout="centered")
 
@@ -116,9 +118,9 @@ else:
     if role == 'Crew':
         view = "Field Logging"
     elif role == 'Foreman':
-        view = st.selectbox("Select View", ["Field Logging", "Foreman Review"])
+        view = st.selectbox("Select View", ["Field Logging", "Foreman Review", "📋 Force Account Sign-off"])
     elif role == 'Admin':
-        view = st.selectbox("Select View", ["Field Logging", "Foreman Review", "Office Dashboard"])
+        view = st.selectbox("Select View", ["Field Logging", "Foreman Review", "📋 Force Account Sign-off", "Office Dashboard"])
 
     if view == "Field Logging":
         st.header("Log Field Hours")
@@ -253,6 +255,84 @@ else:
                         st.rerun()
                     st.markdown("---")
 
+    elif view == "📋 Force Account Sign-off":
+        if st.session_state.logged_in_user_role not in ['Foreman', 'Admin']:
+            st.error("Access Denied")
+            st.stop()
+        
+        st.header("📋 Force Account Sign-off")
+        st.markdown("Review and obtain client signature for Time & Materials (Cost Code 99-000) labor and equipment logs.")
+        
+        projects_df = db.get_projects()
+        if projects_df.empty:
+            st.warning("No projects available.")
+        else:
+            project_options = dict(zip(projects_df['project_name'], projects_df['id']))
+            selected_project = st.selectbox("Select Project for T&M Sign-off", list(project_options.keys()))
+            proj_id = project_options[selected_project]
+            
+            l_logs, eq_logs = db.get_unsigned_tm_logs(proj_id)
+            
+            if not l_logs and not eq_logs:
+                st.info("No unsigned T&M logs for this project.")
+            else:
+                st.subheader("Unsigned T&M Logs")
+                if l_logs:
+                    st.markdown("**Labor Logs**")
+                    import pandas as pd
+                    st.dataframe(pd.DataFrame(l_logs)[['date', 'worker_name', 'hours_worked', 'work_description']], use_container_width=True)
+                if eq_logs:
+                    st.markdown("**Equipment Logs**")
+                    st.dataframe(pd.DataFrame(eq_logs)[['date', 'equipment_name', 'hours_used']], use_container_width=True)
+                
+                with st.form("fa_signoff_form"):
+                    client_rep = st.text_input("Client Representative Name")
+                    
+                    st.markdown("**Client Signature**")
+                    canvas_result = st_canvas(
+                        fill_color="rgba(255, 165, 0, 0.3)",
+                        stroke_width=3,
+                        stroke_color="#000000",
+                        background_color="#EEEEEE",
+                        update_streamlit=True,
+                        height=200,
+                        drawing_mode="freedraw",
+                        key="canvas",
+                    )
+                    
+                    submit_signoff = st.form_submit_button("SUBMIT FORCE ACCOUNT SIGN-OFF")
+                    
+                    if submit_signoff:
+                        if not client_rep:
+                            st.error("Client Representative Name is required.")
+                        elif canvas_result.image_data is None:
+                            st.error("Signature is required.")
+                        else:
+                            import numpy as np
+                            from PIL import Image
+                            from io import BytesIO
+                            
+                            # Convert from rgba to rgb
+                            img = Image.fromarray(canvas_result.image_data.astype('uint8'), 'RGBA')
+                            # Check if the canvas is actually drawn on (not completely empty)
+                            if not np.any(canvas_result.image_data[:, :, 3]):
+                                st.error("Please provide a signature.")
+                            else:
+                                bg = Image.new("RGB", img.size, (255, 255, 255))
+                                bg.paste(img, mask=img.split()[3])
+                                
+                                buffered = BytesIO()
+                                bg.save(buffered, format="PNG")
+                                img_str = base64.b64encode(buffered.getvalue()).decode()
+                                
+                                l_ids = [l['id'] for l in l_logs]
+                                eq_ids = [e['id'] for e in eq_logs]
+                                
+                                db.create_force_account(proj_id, client_rep, img_str, l_ids, eq_ids)
+                                st.success("Force Account submitted successfully!")
+                                import time; time.sleep(1)
+                                st.rerun()
+
     elif view == "Office Dashboard":
         if st.session_state.logged_in_user_role != 'Admin':
             st.error("Access Denied")
@@ -277,6 +357,18 @@ else:
             st.download_button("Export Equipment to CSV", csv_eq, "equipment_summary.csv", "text/csv", key="eq_csv")
         else:
             st.info("No equipment hours logged yet.")
+
+        st.subheader("📋 Signed Force Accounts")
+        fa_df = db.get_signed_force_accounts()
+        if not fa_df.empty:
+            for _, row in fa_df.iterrows():
+                with st.expander(f"Ticket #{row['id']} - {row['Project']} - {row['date']}"):
+                    st.markdown(f"**Client Representative:** {row['client_representative']}")
+                    img_data = base64.b64decode(row['signature_data'])
+                    st.image(img_data, caption="Client Signature")
+        else:
+            st.info("No signed Force Accounts yet.")
+            
             
         with st.expander("⚙️ Employee Permissions & Administration"):
             st.markdown("### Update Existing Permissions")
@@ -311,7 +403,7 @@ else:
                         
                         # Generate the invite link using Streamlit's base URL configuration combined with the token
                         # In many deployments the base URL could be derived from the request, but we will use the standard local format for the demo.
-                        invite_link = f"http://localhost:8501/?invite={token}"
+                        invite_link = f"http://localhost:8501/?invite={token}&email={new_emp_email}"
                         
                         st.toast(f"Successfully added {new_first_name} {new_last_name} to the system!")
                         st.success(f"**Invitation Link Generated:**\n\n[Click here or copy this link]({invite_link})\n\n`{invite_link}`")

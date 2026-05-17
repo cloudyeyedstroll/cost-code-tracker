@@ -17,6 +17,7 @@ A mobile-first, production-ready application designed to streamline field labor 
 ### 💼 Office Dashboard & Live Costing
 - **Real-Time Financials:** Live calculation of "Total Labor Cost ($)" and "Total Equipment Cost ($)" based on underlying hourly wage and machine charge-out rates.
 - **Automated Aggregation:** Daily summaries automatically group hours by cost code and equipment assets.
+- **Force Account & T&M Tickets:** Dedicated interface for generating and reviewing Time & Material tickets (Cost Code 99-000) equipped with digital signature captures rendering securely on the dashboard.
 - **One-Click Exports:** Export labor and equipment reports directly to CSV to streamline invoicing, payroll, and bidding workflows.
 
 ### 🔒 Security & Data Integrity
@@ -26,6 +27,7 @@ A mobile-first, production-ready application designed to streamline field labor 
 
 ## 🛠️ Technology Stack
 - **Frontend/Backend:** [Python](https://www.python.org/) & [Streamlit](https://streamlit.io/)
+- **Digital Signatures:** `streamlit-drawable-canvas`
 - **Database & Auth:** [Supabase](https://supabase.com/) (PostgreSQL)
 - **Data Manipulation:** Pandas
 
