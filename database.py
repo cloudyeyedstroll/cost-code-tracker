@@ -269,7 +269,16 @@ def approve_all_pending(project_id):
 
 def get_labor_summary():
     res = supabase.table('labor_summary_view').select('*').execute()
-    return pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=['Date', 'Project', 'Worker', 'Start Time', 'End Time', 'Cost Code', 'Status', 'Total Labor Hours', 'Total Labor Cost ($)', 'Description'])
+    if not res.data:
+        return pd.DataFrame(columns=['Date', 'Project', 'Worker', 'Start Time', 'End Time', 'Cost Code', 'Status', 'Total Labor Hours', 'Total Labor Cost ($)', 'Description'])
+        
+    df = pd.DataFrame(res.data)
+    projs = pd.DataFrame(supabase.table('projects').select('job_number, project_name').execute().data)
+    df = df.merge(projs, left_on='Project', right_on='project_name', how='left')
+    df['Project'] = df['job_number'].fillna('') + ' ' + df['Project']
+    df['Project'] = df['Project'].str.strip()
+    df = df.drop(columns=['job_number', 'project_name'])
+    return df
 
 def get_equipment_summary():
     # No view was created, fetch and join in pandas

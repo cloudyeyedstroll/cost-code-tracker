@@ -34,6 +34,7 @@ A mobile-first, production-ready Construction Job Costing application designed t
 ### 4. Office Dashboard & Reporting
 - **Live Cost Tracking:** Integrated financial calculations directly into SQL queries to present real-time "Total Labor Cost ($)" and "Total Equipment Cost ($)" on the dashboard.
 - **Data Summaries:** Created SQL queries to aggregate daily labor and equipment hours.
+- **Multi-Project Analytical Views:** Implemented global project-level filtering, allowing administrators to isolate analytics, cost tracking, and CSV exports by specific Job Number / Project Name, ensuring high-fidelity reporting across multiple concurrent sites.
 - **Asset Tracking:** Refined equipment summary queries to track and display specific machinery (Unit Number & Make/Model) alongside aggregate cost code hours.
 - **Data Export:** Integrated one-click CSV export functionality for both labor and equipment reports to streamline billing workflows.
 - **Project & Job Management:** Added an intuitive, dynamic project creation interface allowing administrators to instantly spin up and deploy new jobs to field crews directly from the Office Dashboard without backend migrations. The schema and interface now track a unique `job_number` (e.g., c25-05) to align with standard project tracking.

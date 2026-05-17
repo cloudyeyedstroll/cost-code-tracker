@@ -28,3 +28,8 @@ With every code update or feature completion, you MUST:
 ## 3. Enforcement Gate
 - Do not mark an issue or user prompt as "Complete" until both 'project.md' and 'README.md' have been modified, saved, and structurally audited for markdown formatting errors.
 - At the start of every new user prompt or sub-task iteration, read this file ('agent.md') first to ground your operational workflow requirements.
+
+## 4. Staging Credentials for Automated Verification
+When executing your autonomous browser testing subagent protocol, always utilize the following administrative credentials to log in and verify the Office Dashboard functionality:
+- **Test Admin Email:** admin2@example.com
+- **Test Admin Password:** Password123!

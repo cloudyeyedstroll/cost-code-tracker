@@ -373,32 +373,57 @@ else:
             
         st.header("Office Dashboard")
         
+        projects_df = db.get_projects()
+        filter_options = ["✨ All Active Projects"]
+        if not projects_df.empty:
+            filter_options += projects_df['display_name'].tolist()
+            
+        selected_project_filter = st.selectbox("Filter Dashboard by Project", options=filter_options)
+        
         st.subheader("Labor Hours Summary")
         labor_summary = db.get_labor_summary()
         if not labor_summary.empty:
-            st.dataframe(labor_summary, use_container_width=True)
-            csv_labor = labor_summary.to_csv(index=False).encode('utf-8')
-            st.download_button("Export Labor to CSV", csv_labor, "labor_summary.csv", "text/csv", key="labor_csv")
+            if selected_project_filter != "✨ All Active Projects":
+                labor_summary = labor_summary[labor_summary['Project'] == selected_project_filter]
+                
+            if not labor_summary.empty:
+                st.dataframe(labor_summary, use_container_width=True)
+                csv_labor = labor_summary.to_csv(index=False).encode('utf-8')
+                st.download_button("Export Labor to CSV", csv_labor, "labor_summary.csv", "text/csv", key="labor_csv")
+            else:
+                st.info(f"No labor hours logged for {selected_project_filter}.")
         else:
             st.info("No labor hours logged yet.")
             
         st.subheader("Equipment Hours Summary")
         eq_summary = db.get_equipment_summary()
         if not eq_summary.empty:
-            st.dataframe(eq_summary, use_container_width=True)
-            csv_eq = eq_summary.to_csv(index=False).encode('utf-8')
-            st.download_button("Export Equipment to CSV", csv_eq, "equipment_summary.csv", "text/csv", key="eq_csv")
+            if selected_project_filter != "✨ All Active Projects":
+                eq_summary = eq_summary[eq_summary['Project'] == selected_project_filter]
+                
+            if not eq_summary.empty:
+                st.dataframe(eq_summary, use_container_width=True)
+                csv_eq = eq_summary.to_csv(index=False).encode('utf-8')
+                st.download_button("Export Equipment to CSV", csv_eq, "equipment_summary.csv", "text/csv", key="eq_csv")
+            else:
+                st.info(f"No equipment hours logged for {selected_project_filter}.")
         else:
             st.info("No equipment hours logged yet.")
 
         st.subheader("📋 Signed Force Accounts")
         fa_df = db.get_signed_force_accounts()
         if not fa_df.empty:
-            for _, row in fa_df.iterrows():
-                with st.expander(f"Ticket #{row['id']} - {row['Project']} - {row['date']}"):
-                    st.markdown(f"**Client Representative:** {row['client_representative']}")
-                    img_data = base64.b64decode(row['signature_data'])
-                    st.image(img_data, caption="Client Signature")
+            if selected_project_filter != "✨ All Active Projects":
+                fa_df = fa_df[fa_df['Project'] == selected_project_filter]
+                
+            if not fa_df.empty:
+                for _, row in fa_df.iterrows():
+                    with st.expander(f"Ticket #{row['id']} - {row['Project']} - {row['date']}"):
+                        st.markdown(f"**Client Representative:** {row['client_representative']}")
+                        img_data = base64.b64decode(row['signature_data'])
+                        st.image(img_data, caption="Client Signature")
+            else:
+                st.info(f"No signed Force Accounts for {selected_project_filter}.")
         else:
             st.info("No signed Force Accounts yet.")
             
