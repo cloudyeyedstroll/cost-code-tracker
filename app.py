@@ -37,26 +37,27 @@ p, label, div[data-baseweb="select"] *, div[data-baseweb="radio"] * {
 # Initialize database
 db.setup()
 
-# Check for invitation link
-if "invite" in st.query_params and "email" in st.query_params:
-    token = st.query_params["invite"]
-    email = st.query_params["email"]
-    pending_emp = db.get_employee_by_token(email)
+# Check for native Supabase invite token hash
+if "token_hash" in st.query_params:
+    token_hash = st.query_params.get("token_hash")
     
-    if not pending_emp or pending_emp['account_status'] != 'Pending':
+    # Immediately verify the hash
+    is_valid, user = db.verify_invite_hash(token_hash)
+    
+    if not is_valid:
         st.query_params.clear()
-        st.error("Invalid or expired invitation link.")
+        st.error("This invitation link is invalid or has expired.")
         if st.button("Return to Login"):
             st.rerun()
         st.stop()
         
-    st.header("Activate Your Account")
-    st.write(f"Welcome {pending_emp['first_name']}! Please set up a password to activate your time card account.")
+    st.header("🔐 Activate Your Mobile Account")
+    st.write("Welcome! Please set up a secure password to activate your time card access.")
     
     with st.form("activation_form"):
-        new_password = st.text_input("Password", type="password")
+        new_password = st.text_input("Create Secure Password", type="password")
         confirm_password = st.text_input("Confirm Password", type="password")
-        submit_activation = st.form_submit_button("ACTIVATE ACCOUNT", use_container_width=True)
+        submit_activation = st.form_submit_button("ACTIVATE TIME CARD ACCESS", use_container_width=True)
         
         if submit_activation:
             if not new_password or not confirm_password:
@@ -66,18 +67,16 @@ if "invite" in st.query_params and "email" in st.query_params:
             elif len(new_password) < 6:
                 st.error("Password must be at least 6 characters long.")
             else:
-                success = db.activate_employee_account(email, token, new_password)
+                success = db.activate_employee_account(new_password)
                 if success:
                     st.query_params.clear()
                     st.success("Account activated successfully! You can now log in.")
                     import time; time.sleep(1.5)
                     st.rerun()
                 else:
-                    st.error("Failed to activate account. The link may have expired.")
+                    st.error("Failed to activate account. The session may have expired.")
     st.stop()
-elif "invite" in st.query_params:
-    st.error("Invalid invitation link. Email parameter missing.")
-    st.stop()
+
 
 if 'logged_in_user_id' not in st.session_state:
     st.session_state.logged_in_user_id = None
@@ -424,16 +423,13 @@ else:
                     if not new_first_name or not new_last_name or not new_emp_email:
                         st.error("First Name, Last Name, and Email are required.")
                     else:
-                        token = secrets.token_urlsafe(16)
-                        db.create_employee_invite(new_first_name, new_last_name, new_emp_email, new_emp_role, token)
+                        auth_id = db.create_employee_invite(new_first_name, new_last_name, new_emp_email, new_emp_role)
                         
-                        # Generate the invite link using Streamlit's base URL configuration combined with the token
-                        # In many deployments the base URL could be derived from the request, but we will use the standard local format for the demo.
-                        invite_link = f"http://localhost:8501/?invite={token}&email={new_emp_email}"
-                        
-                        st.toast(f"Successfully added {new_first_name} {new_last_name} to the system!")
-                        st.success(f"**Invitation Link Generated:**\n\n[Click here or copy this link]({invite_link})\n\n`{invite_link}`")
-                        print(f"INVITATION LINK FOR {new_emp_email}: {invite_link}")
+                        if auth_id:
+                            st.toast(f"Successfully added {new_first_name} {new_last_name} to the system!")
+                            st.success(f"📩 SiteDocs-style invitation successfully dispatched to {new_emp_email} via Supabase Auth.")
+                        else:
+                            st.error("Failed to create user or dispatch invitation. Ensure they don't already exist or check configuration.")
                         
             st.divider()
 

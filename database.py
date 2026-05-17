@@ -3,6 +3,9 @@ import os
 import streamlit as st
 from supabase import create_client, Client
 from dotenv import load_dotenv
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 import secrets
 
 load_dotenv()
@@ -22,11 +25,24 @@ if not key:
     except Exception:
         pass
 
+service_role_key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+if not service_role_key:
+    try:
+        service_role_key = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
+    except Exception:
+        pass
+
 try:
     supabase: Client = create_client(url, key)
+    
+    if service_role_key:
+        supabase_admin: Client = create_client(url, service_role_key)
+    else:
+        supabase_admin = None
 except Exception as e:
     print(f"Failed to initialize Supabase client: {e}")
     supabase = None
+    supabase_admin = None
 
 def setup():
     # Supabase handles its own schema, so setup is a no-op locally.
@@ -108,16 +124,16 @@ def update_employee_permissions(employee_id, new_role):
     supabase.table('employees').update({"role": new_role}).eq('id', employee_id).execute()
 
 def create_employee_invite(first_name, last_name, email, role, token=None):
-    # For Supabase Auth, we generate a temp password (which acts as our invite token)
-    temp_password = token if token else secrets.token_urlsafe(16)
-    
-    # Create the user in Supabase Auth
+    if not supabase_admin:
+        print("Error: Supabase Admin client is not configured. SUPABASE_SERVICE_ROLE_KEY is required.")
+        return None
+        
     try:
-        auth_response = supabase.auth.admin.create_user({
-            "email": email,
-            "password": temp_password,
-            "email_confirm": True
-        })
+        # Trigger native Supabase Admin Auth invite
+        auth_response = supabase_admin.auth.admin.invite_user_by_email(
+            email, 
+            options={"data": {"first_name": first_name, "last_name": last_name, "role": role}}
+        )
         auth_id = auth_response.user.id
         
         # Insert into our public.employees table
@@ -127,28 +143,37 @@ def create_employee_invite(first_name, last_name, email, role, token=None):
             "email": email,
             "account_status": "Pending",
             "role": role,
-            "auth_id": auth_id,
-            "invite_token": temp_password
+            "auth_id": auth_id
         }).execute()
-        return temp_password
+        return auth_id
     except Exception as e:
         print(f"Error creating employee: {e}")
         return None
 
-def get_employee_by_token(email):
-    # We repurpose this to fetch by email during activation
-    res = supabase.table('employees').select('id, first_name, last_name, email, account_status').eq('email', email).execute()
-    return res.data[0] if res.data else None
-
-def activate_employee_account(employee_email, temp_password, new_password):
-    # Log them in with the temp password to get a session
+def verify_invite_hash(token_hash):
     try:
-        res = supabase.auth.sign_in_with_password({"email": employee_email, "password": temp_password})
+        # Execute a server-side verification request using the native Supabase GoTrue routing client
+        res = supabase.auth.verify_otp({"token_hash": token_hash, "type": "invite"})
         if res.session:
+            return True, res.user
+    except Exception as e:
+        print(f"Token verification error: {e}")
+    return False, None
+
+def activate_employee_account(new_password):
+    try:
+        # User is already authenticated via verify_invite_hash OTP session
+        user_res = supabase.auth.get_user()
+        if user_res.user:
+            user_email = user_res.user.email
+            
             # Now we can update their password securely
             supabase.auth.update_user({"password": new_password})
+            
             # Update their status in the public.employees table
-            supabase.table('employees').update({"account_status": "Active"}).eq('email', employee_email).execute()
+            supabase.table('employees').update({"account_status": "Active"}).eq('email', user_email).execute()
+            
+            # Sign out to force standard login
             supabase.auth.sign_out()
             return True
     except Exception as e:
