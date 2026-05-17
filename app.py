@@ -135,8 +135,9 @@ else:
         
         if 'form_reset_key' not in st.session_state:
             st.session_state.form_reset_key = 0
-        if 'alloc_count' not in st.session_state:
-            st.session_state.alloc_count = 1
+        if 'alloc_ids' not in st.session_state:
+            st.session_state.alloc_ids = [0]
+            st.session_state.next_alloc_id = 1
 
         prefix = f"fk_{st.session_state.form_reset_key}_"
         
@@ -173,14 +174,22 @@ else:
             st.markdown("Allocate your shift hours across multiple cost codes.")
             
             allocations = []
-            for i in range(st.session_state.alloc_count):
-                st.markdown(f"**Allocation {i+1}**")
+            for i, alloc_id in enumerate(st.session_state.alloc_ids):
+                c_head, c_del = st.columns([5, 1])
+                with c_head:
+                    st.markdown(f"**Allocation {i+1}**")
+                with c_del:
+                    if len(st.session_state.alloc_ids) > 1:
+                        if st.button("🗑️ Remove", key=f"{prefix}del_{alloc_id}"):
+                            st.session_state.alloc_ids.remove(alloc_id)
+                            st.rerun()
+                            
                 c1, c2 = st.columns([2, 1])
                 with c1:
-                    selected_cc = st.selectbox(f"Cost Code", list(cost_code_options.keys()), key=f"{prefix}cc_{i}")
+                    selected_cc = st.selectbox(f"Cost Code", list(cost_code_options.keys()), key=f"{prefix}cc_{alloc_id}")
                 with c2:
-                    alloc_hours = st.number_input(f"Hours", min_value=0.0, step=0.5, value=0.0, key=f"{prefix}hrs_{i}")
-                alloc_desc = st.text_input(f"Work Description (Optional)", key=f"{prefix}desc_{i}")
+                    alloc_hours = st.number_input(f"Hours", min_value=0.0, step=0.5, value=0.0, key=f"{prefix}hrs_{alloc_id}")
+                alloc_desc = st.text_input(f"Work Description (Optional)", key=f"{prefix}desc_{alloc_id}")
                 allocations.append({
                     "cost_code": selected_cc,
                     "hours": alloc_hours,
@@ -189,7 +198,8 @@ else:
                 st.markdown("---")
             
             if st.button("➕ Add Another Cost Code"):
-                st.session_state.alloc_count += 1
+                st.session_state.alloc_ids.append(st.session_state.next_alloc_id)
+                st.session_state.next_alloc_id += 1
                 st.rerun()
                 
         else:
@@ -221,7 +231,8 @@ else:
                             db.log_labor(log_date, project_id, st.session_state.logged_in_user_id, cost_code_id, alloc["hours"], alloc["description"], start_time_str, end_time_str)
                     
                     st.success(f"Successfully logged {total_allocated} labor hours.")
-                    st.session_state.alloc_count = 1
+                    st.session_state.alloc_ids = [0]
+                    st.session_state.next_alloc_id = 1
                     st.session_state.form_reset_key += 1
                     st.rerun()
             else:
@@ -229,7 +240,8 @@ else:
                 eq_id = equipment_options[selected_equipment]
                 db.log_equipment(log_date, project_id, st.session_state.logged_in_user_id, eq_id, cost_code_id, hours)
                 st.success(f"Successfully logged {hours} equipment hours for {selected_equipment}.")
-                st.session_state.alloc_count = 1
+                st.session_state.alloc_ids = [0]
+                st.session_state.next_alloc_id = 1
                 st.session_state.form_reset_key += 1
                 st.rerun()
 
