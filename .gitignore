@@ -1,0 +1,6 @@
+__pycache__/
+*.db
+!job_costing_v7.db
+.env
+.venv/
+venv/
