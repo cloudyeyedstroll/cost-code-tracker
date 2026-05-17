@@ -8,24 +8,28 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import secrets
 
-load_dotenv(find_dotenv())
+from dotenv import load_dotenv, find_dotenv, dotenv_values
 
-# Check os.environ first, fallback to st.secrets for Streamlit Cloud deployments
-url: str = os.environ.get("SUPABASE_URL")
+env_path = find_dotenv()
+load_dotenv(env_path, override=True)
+env_vars = dotenv_values(env_path) if env_path else {}
+
+# Check os.environ first, fallback to dotenv parsing, then st.secrets
+url: str = os.environ.get("SUPABASE_URL") or env_vars.get("SUPABASE_URL")
 if not url:
     try:
         url = st.secrets["SUPABASE_URL"]
     except Exception:
         pass
 
-key: str = os.environ.get("SUPABASE_KEY")
+key: str = os.environ.get("SUPABASE_KEY") or env_vars.get("SUPABASE_KEY")
 if not key:
     try:
         key = st.secrets["SUPABASE_KEY"]
     except Exception:
         pass
 
-service_role_key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY")
+service_role_key: str = os.environ.get("SUPABASE_SERVICE_ROLE_KEY") or env_vars.get("SUPABASE_SERVICE_ROLE_KEY")
 if not service_role_key:
     try:
         service_role_key = st.secrets["SUPABASE_SERVICE_ROLE_KEY"]
