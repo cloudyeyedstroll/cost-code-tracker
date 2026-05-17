@@ -36,9 +36,10 @@ p, label, div[data-baseweb="select"] *, div[data-baseweb="radio"] * {
 db.setup()
 
 # Check for invitation link
-if "invite" in st.query_params:
+if "invite" in st.query_params and "email" in st.query_params:
     token = st.query_params["invite"]
-    pending_emp = db.get_employee_by_token(token)
+    email = st.query_params["email"]
+    pending_emp = db.get_employee_by_token(email)
     
     if not pending_emp or pending_emp['account_status'] != 'Pending':
         st.query_params.clear()
@@ -63,11 +64,17 @@ if "invite" in st.query_params:
             elif len(new_password) < 6:
                 st.error("Password must be at least 6 characters long.")
             else:
-                db.activate_employee_account(pending_emp['id'], new_password)
-                st.query_params.clear()
-                st.success("Account activated successfully! You can now log in.")
-                import time; time.sleep(1.5)
-                st.rerun()
+                success = db.activate_employee_account(email, token, new_password)
+                if success:
+                    st.query_params.clear()
+                    st.success("Account activated successfully! You can now log in.")
+                    import time; time.sleep(1.5)
+                    st.rerun()
+                else:
+                    st.error("Failed to activate account. The link may have expired.")
+    st.stop()
+elif "invite" in st.query_params:
+    st.error("Invalid invitation link. Email parameter missing.")
     st.stop()
 
 if 'logged_in_user_id' not in st.session_state:

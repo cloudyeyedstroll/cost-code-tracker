@@ -1,19 +1,19 @@
 # Construction Job Costing MVP
 
 ## Project Overview
-A mobile-first, production-ready Construction Job Costing application designed to allow field foremen to log labor and equipment hours securely on their mobile devices, and for the office to view and export aggregated daily summaries. The application uses Python and Streamlit for the frontend/backend and SQLite for local data persistence.
+A mobile-first, production-ready Construction Job Costing application designed to allow field foremen to log labor and equipment hours securely on their mobile devices, and for the office to view and export aggregated daily summaries. The application uses Python and Streamlit for the frontend/backend and Supabase (PostgreSQL) for scalable cloud data persistence.
 
 ## What Has Been Done
 
-### 1. Database Architecture (SQLite)
-- Built a fully relational database (`job_costing_v5.db`) with `projects`, `employees`, `equipment`, `cost_codes`, `labor_logs`, and `equipment_logs` tables.
+### 1. Database Architecture (Supabase / PostgreSQL)
+- Built a robust, cloud-native schema mapped via Supabase with `projects`, `employees`, `equipment`, `cost_codes`, `labor_logs`, and `equipment_logs` tables.
 - Implemented robust DB initialization and data seeding with realistic civil construction infrastructure scenarios.
 - Added `hourly_rate` to calculate live costs, `is_foreman` for role-based access, and a `status` field for the approval workflow.
 - Included `start_time` and `end_time` to labor logs to capture explicit shift durations.
 - Prepared schema for future integrations by including `procore_id` fields in relevant tables.
 
 ### 2. Security & User Flow
-- **PIN Authentication:** Implemented a secure 4-digit PIN login system for field employees.
+- **Supabase Auth:** Integrated secure, email/password-based authentication with onboarding activation links.
 - **Session State Management:** Maintained active login states using Streamlit's session state, ensuring workers can only log hours under their authenticated profile to prevent data entry errors.
 - **Role-Based Navigation:** The application dynamically adjusts navigation, granting foremen an exclusive "Foreman Review" view to bulk-approve pending logs.
 
@@ -35,26 +35,22 @@ A mobile-first, production-ready Construction Job Costing application designed t
 
 ## Planned Features & Next Steps
 
-### 1. Cloud Database Migration
-- **Goal:** Move away from a local `.db` file to a managed cloud PostgreSQL database (e.g., Supabase, Neon, AWS RDS).
-- **Why:** This will ensure persistent data storage independent of the application server, allowing for safe, stateless deployment on modern platforms without the risk of data loss.
-
-### 2. Procore Integration
+### 1. Procore Integration
 - **Goal:** Connect to the Procore API.
 - **Why:** To enable automated, bidirectional syncing of Projects, Cost Codes, Employees, and Equipment. The database schema has already been prepped with `procore_id` columns to support this.
 
-### 3. Advanced Dashboard Filtering
+### 2. Advanced Dashboard Filtering
 - **Goal:** Implement date range pickers and preset filters (e.g., "Last 7 Days", "Last 30 Days", "Current Month").
 - **Why:** To improve performance and usability on the Office Dashboard as the dataset grows over time.
 
-### 4. Role-Based Access Control (RBAC)
+### 3. Role-Based Access Control (RBAC)
 - **Goal:** Introduce Administrator and Standard User roles.
 - **Why:** To lock the "Office Dashboard" behind an administrative login, ensuring that field workers only have access to the "Field Logging" interface.
 
-### 5. Production Deployment
+### 4. Production Deployment
 - **Goal:** Deploy the application to Firebase (using Firebase Hosting combined with Cloud Run for the Python backend).
 - **Why:** To distribute the application to the field crew via a standard URL using Google's scalable Firebase platform. This relies heavily on completing the Cloud Database Migration first.
 
-### 6. Unlimited & Scalable Cost Code Allocation (10+ Codes)
+### 5. Unlimited & Scalable Cost Code Allocation (10+ Codes)
 - **Goal:** Expand the frontend time card interface from a fixed 3-slot allocation loop to a dynamic, unlimited row-generation system.
 - **Why:** To support complex, multi-activity field shifts where crew members or heavy equipment operators bounce between 10 or more distinct tasks during a single shift, ensuring the strict duration validation gates remain active no matter how many codes are added.

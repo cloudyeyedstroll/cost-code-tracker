@@ -20,20 +20,19 @@ A mobile-first, production-ready application designed to streamline field labor 
 - **One-Click Exports:** Export labor and equipment reports directly to CSV to streamline invoicing, payroll, and bidding workflows.
 
 ### 🔒 Security & Data Integrity
-- **Secure Authentication:** 4-digit PIN login system.
+- **Secure Authentication:** Robust integration with Supabase Auth using email, passwords, and secure activation links.
 - **Session Management:** Prevents data entry mix-ups by strictly tying logged hours to the currently authenticated user profile.
-- **SQLite Database:** Fully relational, local data persistence out-of-the-box (with schema prepared for future cloud migration).
+- **Supabase Database:** Hosted PostgreSQL ensuring fully relational, highly-available cloud data persistence.
 
 ## 🛠️ Technology Stack
 - **Frontend/Backend:** [Python](https://www.python.org/) & [Streamlit](https://streamlit.io/)
-- **Database:** SQLite
+- **Database & Auth:** [Supabase](https://supabase.com/) (PostgreSQL)
 - **Data Manipulation:** Pandas
 
 ## 🔮 Future Roadmap
-- **Cloud Database Migration:** Transitioning to a managed PostgreSQL database (e.g., Supabase, AWS RDS) for stateless deployment.
 - **Procore API Integration:** Bidirectional syncing of Projects, Cost Codes, and Employees directly with Procore.
 - **Advanced Analytics:** Adding date range pickers and preset filters to the Office Dashboard.
-- **Production Deployment:** Hosting on Render or Heroku for widespread crew access.
+- **Production Deployment:** Hosting on Google Cloud Run or Vercel for widespread crew access.
 
 ## 🏃‍♂️ Getting Started
 
