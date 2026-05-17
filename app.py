@@ -143,7 +143,7 @@ else:
         
         log_date = st.date_input("Date", datetime.date.today(), key=f"{prefix}date")
         
-        project_options = dict(zip(projects_df['project_name'], projects_df['id']))
+        project_options = dict(zip(projects_df['display_name'], projects_df['id']))
         selected_project = st.selectbox("Project", list(project_options.keys()), key=f"{prefix}proj")
         
         cost_code_options = dict(zip(cost_codes_df['display_name'], cost_codes_df['id']))
@@ -250,7 +250,7 @@ else:
         
         # Get projects for the project specific approve all
         projects_df = db.get_projects()
-        project_options = dict(zip(projects_df['project_name'], projects_df['id']))
+        project_options = dict(zip(projects_df['display_name'], projects_df['id']))
         selected_project_for_approval = st.selectbox("Select Project for Bulk Approval", list(project_options.keys()))
         
         if st.button("APPROVE ALL PENDING FOR SELECTED PROJECT", use_container_width=True):
@@ -300,7 +300,7 @@ else:
         if projects_df.empty:
             st.warning("No projects available.")
         else:
-            project_options = dict(zip(projects_df['project_name'], projects_df['id']))
+            project_options = dict(zip(projects_df['display_name'], projects_df['id']))
             selected_project = st.selectbox("Select Project for T&M Sign-off", list(project_options.keys()))
             proj_id = project_options[selected_project]
             
@@ -485,15 +485,16 @@ else:
 
         with st.expander("🏗️ Project & Job Management"):
             with st.form("add_project_form"):
+                new_job_number = st.text_input("Job Number (e.g., c25-05)")
                 new_project_name = st.text_input("Project / Job Name (e.g., Fern Street Sidewalks)")
                 new_project_location = st.text_input("Project Location / Town (e.g., Chilliwack, BC)")
                 add_proj_submit = st.form_submit_button("CREATE NEW PROJECT", use_container_width=True)
                 
                 if add_proj_submit:
-                    if not new_project_name or not new_project_location:
-                        st.error("Project Name and Location are required.")
+                    if not new_job_number or not new_project_name or not new_project_location:
+                        st.error("Job Number, Project Name, and Location are required.")
                     else:
-                        success, msg = db.add_project(new_project_name, new_project_location)
+                        success, msg = db.add_project(new_job_number, new_project_name, new_project_location)
                         if success:
                             st.toast("🏗️ New project successfully initialized and pushed live to field crews!")
                             import time; time.sleep(0.5)

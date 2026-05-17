@@ -63,12 +63,17 @@ def seed_db():
 
 # Helper queries for UI
 def get_projects():
-    response = supabase.table('projects').select('id, project_name').execute()
-    return pd.DataFrame(response.data) if response.data else pd.DataFrame(columns=['id', 'project_name'])
+    response = supabase.table('projects').select('id, job_number, project_name').execute()
+    df = pd.DataFrame(response.data) if response.data else pd.DataFrame(columns=['id', 'job_number', 'project_name'])
+    if not df.empty:
+        df['display_name'] = df['job_number'].fillna('') + ' ' + df['project_name']
+        df['display_name'] = df['display_name'].str.strip()
+    return df
 
-def add_project(project_name, location):
+def add_project(job_number, project_name, location):
     try:
         supabase.table('projects').insert({
+            "job_number": job_number,
             "project_name": project_name,
             "location": location,
             "procore_id": None
@@ -230,7 +235,7 @@ def get_pending_equipment_logs():
         return pd.DataFrame(columns=['log_id', 'Date', 'project_id', 'Project', 'Logged By', 'Equipment Asset', 'Cost Code', 'Hours'])
     
     logs_df = pd.DataFrame(eq_logs.data)
-    projs = pd.DataFrame(supabase.table('projects').select('id, project_name').execute().data)
+    projs = pd.DataFrame(supabase.table('projects').select('id, job_number, project_name').execute().data)
     emps = pd.DataFrame(supabase.table('employees').select('id, first_name, last_name').execute().data)
     eqs = pd.DataFrame(supabase.table('equipment').select('id, unit_number, make_model').execute().data)
     ccs = pd.DataFrame(supabase.table('cost_codes').select('id, code_number, description').execute().data)
@@ -241,7 +246,8 @@ def get_pending_equipment_logs():
     df = df.merge(eqs, left_on='equipment_id', right_on='id', suffixes=('', '_eq'))
     df = df.merge(ccs, left_on='cost_code_id', right_on='id', suffixes=('', '_c'))
     
-    df['Project'] = df['project_name']
+    df['Project'] = df['job_number'].fillna('') + ' ' + df['project_name']
+    df['Project'] = df['Project'].str.strip()
     df['Logged By'] = df['first_name'] + ' ' + df['last_name']
     df['Equipment Asset'] = df['unit_number'] + ' - ' + df['make_model']
     df['Cost Code'] = df['code_number'] + ' ' + df['description']
@@ -272,7 +278,7 @@ def get_equipment_summary():
         return pd.DataFrame(columns=['Date', 'Project', 'Equipment Asset', 'Cost Code', 'Status', 'Total Equipment Hours', 'Total Equipment Cost ($)'])
         
     logs_df = pd.DataFrame(eq_logs.data)
-    projs = pd.DataFrame(supabase.table('projects').select('id, project_name').execute().data)
+    projs = pd.DataFrame(supabase.table('projects').select('id, job_number, project_name').execute().data)
     eqs = pd.DataFrame(supabase.table('equipment').select('id, unit_number, make_model, hourly_rate').execute().data)
     ccs = pd.DataFrame(supabase.table('cost_codes').select('id, code_number, description').execute().data)
     
@@ -280,7 +286,8 @@ def get_equipment_summary():
     df = df.merge(eqs, left_on='equipment_id', right_on='id', suffixes=('', '_eq'))
     df = df.merge(ccs, left_on='cost_code_id', right_on='id', suffixes=('', '_c'))
     
-    df['Project'] = df['project_name']
+    df['Project'] = df['job_number'].fillna('') + ' ' + df['project_name']
+    df['Project'] = df['Project'].str.strip()
     df['Equipment Asset'] = df['unit_number'] + ' - ' + df['make_model']
     df['Cost Code'] = df['code_number'] + ' ' + df['description']
     df['Date'] = df['date']
@@ -370,8 +377,9 @@ def get_signed_force_accounts():
         return pd.DataFrame()
     
     df = pd.DataFrame(res.data)
-    projs = pd.DataFrame(supabase.table('projects').select('id, project_name').execute().data)
+    projs = pd.DataFrame(supabase.table('projects').select('id, job_number, project_name').execute().data)
     df = df.merge(projs, left_on='project_id', right_on='id', suffixes=('', '_p'))
-    df['Project'] = df['project_name']
+    df['Project'] = df['job_number'].fillna('') + ' ' + df['project_name']
+    df['Project'] = df['Project'].str.strip()
     return df
 
