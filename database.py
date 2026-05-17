@@ -2,13 +2,13 @@ import pandas as pd
 import os
 import streamlit as st
 from supabase import create_client, Client
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 import secrets
 
-load_dotenv()
+load_dotenv(find_dotenv())
 
 # Check os.environ first, fallback to st.secrets for Streamlit Cloud deployments
 url: str = os.environ.get("SUPABASE_URL")
@@ -32,6 +32,8 @@ if not service_role_key:
     except Exception:
         pass
 
+supabase_init_error = None
+
 try:
     supabase: Client = create_client(url, key)
     
@@ -40,6 +42,7 @@ try:
     else:
         supabase_admin = None
 except Exception as e:
+    supabase_init_error = str(e)
     print(f"Failed to initialize Supabase client: {e}")
     supabase = None
     supabase_admin = None
@@ -276,6 +279,10 @@ def get_equipment_summary():
     return grouped.sort_values('Date', ascending=False)
 
 def verify_employee_login(email, password):
+    if supabase is None:
+        url_status = "Set" if url else "Missing"
+        key_status = "Set" if key else "Missing"
+        return {"error": f"Database client not initialized. Error: {supabase_init_error}. URL: {url_status}, KEY: {key_status}"}
     try:
         # Authenticate with Supabase Auth
         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
