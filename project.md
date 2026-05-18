@@ -1,61 +1,51 @@
 # Construction Job Costing MVP
 
 ## Project Overview
-A mobile-first, production-ready Construction Job Costing application designed to allow field foremen to log labor and equipment hours securely on their mobile devices, and for the office to view and export aggregated daily summaries. The application uses Python and Streamlit for the frontend/backend and Supabase (PostgreSQL) for scalable cloud data persistence.
+A mobile-first, production-ready Construction Job Costing application designed to allow field foremen to log labor, equipment, materials, and subcontractor hours securely on their mobile devices, and for the office to view and export aggregated daily summaries. The application uses Python and Streamlit for the frontend/backend and is fully containerized and live on Google Cloud Run at: [https://cost-code-tracker-94816924591.us-central1.run.app/](https://cost-code-tracker-94816924591.us-central1.run.app/). It leverages a live Supabase (PostgreSQL) production cluster for scalable, highly-available cloud data persistence.
 
 ## What Has Been Done
 
 ### 1. Database Architecture (Supabase / PostgreSQL)
-- Built a robust, cloud-native schema mapped via Supabase with `projects`, `employees`, `equipment`, `cost_codes`, `labor_logs`, `equipment_logs`, and `force_accounts` tables.
-- Implemented robust DB initialization and data seeding with realistic civil construction infrastructure scenarios.
-- Added `hourly_rate` to calculate live costs, `is_foreman` for role-based access, and a `status` field for the approval workflow.
-- Included `start_time` and `end_time` to labor logs to capture explicit shift durations.
-- Prepared schema for future integrations by including `procore_id` fields in relevant tables.
-- **Force Account Architecture:** Added a dedicated schema structure for grouping T&M logs to signed tickets, executing schema migration `20260517000000_force_accounts.sql`.
-- **Dynamic Job Titles:** Replaced hardcoded roles with a dynamic, database-driven `job_titles` table mapped to core permission tiers (Admin, Foreman, Crew). Admins can create and assign custom job titles through the Office Dashboard.
+- **Cloud Database Migration:** Transitioned from a local development database to a live Supabase PostgreSQL production cluster.
+- Built a robust, cloud-native schema mapped via Supabase with tables for `projects`, `employees`, `equipment`, `cost_codes`, `labor_logs`, `equipment_logs`, and `force_accounts`.
+- **Advanced Tracking Schemas:** Deployed robust table updates for `report_photos`, `material_logs` (tracking supplier, quantities, and import/export spoils), and `subcontractor_logs` (tracking company name, scope of work, hours, and ticket uploads).
+- **Force Account Architecture:** Added a dedicated schema structure for grouping T&M logs to signed tickets.
+- **Project-Specific Scoping Engine:** Restructured Cost Codes and Equipment from global generic lists to project-specific mappings using a Many-to-Many relational database model (`project_cost_codes` and `project_equipment`).
 
 ### 2. Security & User Flow
-- **Supabase Auth:** Integrated secure, email/password-based authentication with onboarding activation links. Added secure Invite Token logic for standardizing new employee rollouts.
-- **Automated Email Invitations:** Implemented Supabase's native GoTrue Admin Auth invite system. Triggers branded cloud-managed emails securely via the `supabase_admin` client. Solves Streamlit URL hash limitations via a secure `token_hash` query parameter intercept block that seamlessly authenticates and activates new users.
-- **Bulletproof Environment Configuration:** Upgraded the configuration loader with `dotenv_values` and `find_dotenv()` to bypass Streamlit working directory caching issues, ensuring production credentials and database connections initialize flawlessly across all environments.
-- **Session State Management:** Maintained active login states using Streamlit's session state, ensuring workers can only log hours under their authenticated profile to prevent data entry errors.
-- **Role-Based Navigation:** The application dynamically adjusts navigation, granting foremen an exclusive "Foreman Review" view to bulk-approve pending logs.
-- **Admin Management:** Introduced strict administrative controls for permanently deleting employee records (with log conflict validation) and updating roles.
-- **Cloud Config Fallbacks:** Implemented robust configuration parsing in `database.py` to seamlessly fallback to `st.secrets` when cloud environment variables are unavailable, preventing deployment crashes.
+- **Supabase Auth:** Integrated secure, email/password-based authentication with onboarding activation links. 
+- **Automated Email Invitations & Password Resets:** Implemented Supabase's native GoTrue Auth system for sending branded cloud-managed emails securely. Solves Streamlit URL hash limitations via a secure `token_hash` query parameter intercept block that seamlessly authenticates and activates users.
+- **Bulletproof Environment Configuration:** Upgraded the configuration loader to bypass Streamlit caching issues, ensuring production credentials initialize flawlessly. Included dynamic fallback logic and secret sanitization to protect against malformed variables.
+- **Session State Management:** Maintained active login states using Streamlit's session state, tying logs strictly to the authenticated user profile.
+- **Dynamic Job Titles & Roles:** Configurable roles via `job_titles` map securely to system permission tiers (Admin, Foreman, Crew).
 
 ### 3. Mobile-First Field Logging
-- **Dynamic Shift Allocation:** Field workers now log explicit Shift Start and End Times. The app auto-calculates total shift duration and strictly enforces a multi-step allocation UI. We replaced the fixed 3-slot limit with a dynamic form structure that allows adding unlimited cost code allocations using a responsive "➕ Add Another Cost Code" button, and the ability to selectively delete allocations via a "🗑️ Remove" button.
-- **Validation Gates:** Forms are protected by strict validations, showing clear errors and blocking submission if allocated hours do not match the calculated shift duration.
-- **Responsive Layout:** Changed the Streamlit layout to "centered" to prevent horizontal stretching on small screens.
-- **Improved Navigation:** Replaced horizontal tabs with a `st.selectbox` for toggling between views.
-- **Enhanced Touch Targets:** Injected custom CSS to enlarge fonts to 18px and force submission buttons to full-width, 3.2em height with distinct colors for outdoor visibility and ease of use.
-- **Comprehensive Logging:** Added functionality to log both labor (with an optional text-based work description) and equipment hours.
+- **Dynamic Shift Allocation:** Field workers now log explicit Shift Start and End Times. The app auto-calculates total shift duration and strictly enforces a multi-step allocation UI.
+- **Unlimited & Scalable Cost Code Allocation:** Dynamic form structure allows adding unlimited cost code allocations, backed by strict mathematical validations.
+- **Material & Subcontractor Tracking:** Fully built-out mobile interfaces for logging materials (e.g. soil import/export) and hired subcontractor services, complete with the ability to upload physical tickets directly to Supabase storage.
+- **Automated Equipment Mirroring & SMU Tracking:** A conditional heavy equipment workflow auto-clones labor hours into equipment logs, tracks start/end hour meters (SMU), and calculates exact runtimes.
+- **Historical Form Persistence:** "Sticky" defaults automatically remember and pre-populate the active Project, Cost Code, and Equipment inputs based on recent submissions.
 
 ### 4. Office Dashboard & Reporting
 - **Live Cost Tracking:** Integrated financial calculations directly into SQL queries to present real-time "Total Labor Cost ($)" and "Total Equipment Cost ($)" on the dashboard.
-- **Data Summaries:** Created SQL queries to aggregate daily labor and equipment hours.
-- **Multi-Project Analytical Views:** Implemented global project-level filtering, allowing administrators to isolate analytics, cost tracking, and CSV exports by specific Job Number / Project Name, ensuring high-fidelity reporting across multiple concurrent sites.
-- **Asset Tracking:** Refined equipment summary queries to track and display specific machinery (Unit Number & Make/Model) alongside aggregate cost code hours.
-- **Data Export:** Integrated one-click CSV export functionality for both labor and equipment reports to streamline billing workflows.
-- **Project & Job Management:** Added an intuitive, dynamic project creation interface allowing administrators to instantly spin up and deploy new jobs to field crews directly from the Office Dashboard without backend migrations. The schema and interface now track a unique `job_number` (e.g., c25-05) to align with standard project tracking.
-- **Force Account Sign-off (T&M):** Deployed a dedicated view for Foremen/Admins to generate Time & Material tickets (Cost Code 99-000), complete with digital signature capture via `streamlit-drawable-canvas`. Signed tickets render seamlessly on the Office Dashboard.
+- **Automated Daily Blueprint PDF Reporting:** Deployed a new Reporting Engine (`reporting.py`) utilizing `fpdf2`. This generates a high-fidelity, multi-page executive PDF document combining crew resources, fleet utilization, materials, subcontractors, and production logs. Features an automatic, mathematically centered company branding ingestion system.
+- **AI-Powered OCR Architecture Prepared:** Began scaffolding for the `ai_vision.py` pipeline to ingest subcontractor/material tickets, send them through an LLM vision API, and automatically parse key fields (ticket number, company name, scope, hours).
+- **Consolidated Admin Management:** Consolidated project deployment, cost code ingestion, and fleet management into unified structured administrative containers.
+- **Force Account Sign-off (T&M):** Deployed a dedicated view for Foremen/Admins to generate Time & Material tickets (Cost Code 99-000), complete with digital signature capture via `streamlit-drawable-canvas`.
+- **Data Export:** Integrated one-click CSV export functionality for all major log tables to streamline billing workflows.
 
 ---
 
 ## Planned Features & Next Steps
 
-### 1. Procore Integration
-- **Goal:** Connect to the Procore API.
-- **Why:** To enable automated, bidirectional syncing of Projects, Cost Codes, Employees, and Equipment. The database schema has already been prepped with `procore_id` columns to support this.
+### 1. High Priority 1: AI Vision OCR Pipeline for Ticket Parsing
+- **Goal:** Fully activate the AI Vision OCR pipeline (`ai_vision.py`) integrated directly into the subcontractor and material logging forms. 
+- **Why:** To completely eliminate manual data entry for foremen. When a ticket photo is uploaded, the AI will automatically extract properties like Ticket Number, Company Name, Scope of Work, and Hours, returning strict JSON payloads to instantly populate the database.
 
-### 3. Advanced Dashboard Filtering
-- **Goal:** Implement date range pickers and preset filters (e.g., "Last 7 Days", "Last 30 Days", "Current Month").
-- **Why:** To improve performance and usability on the Office Dashboard as the dataset grows over time.
+### 2. High Priority 2: PWA Service Worker & Manifest Deployment
+- **Goal:** Deploy a `manifest.json` and a Service Worker to transform the Streamlit application into a Progressive Web App (PWA).
+- **Why:** To allow users to "Add to Homescreen" for a native, app-like mobile experience without downloading from the App Store, and to pave the way for offline data caching when cellular service drops on remote jobsites.
 
-### 4. Production Deployment
-- **Goal:** Deploy the application to Firebase (using Firebase Hosting combined with Cloud Run for the Python backend).
-- **Why:** To distribute the application to the field crew via a standard URL using Google's scalable Firebase platform. This relies heavily on completing the Cloud Database Migration first.
-
-### 5. Unlimited & Scalable Cost Code Allocation (10+ Codes)
-- **Goal:** Expand the frontend time card interface from a fixed 3-slot allocation loop to a dynamic, unlimited row-generation system.
-- **Why:** To support complex, multi-activity field shifts where crew members or heavy equipment operators bounce between 10 or more distinct tasks during a single shift, ensuring the strict duration validation gates remain active no matter how many codes are added.
+### 3. High Priority 3: Procore/Accounting API Bidirectional Sync
+- **Goal:** Connect to the Procore API and leading accounting suites.
+- **Why:** To enable automated, bidirectional syncing of Projects, Cost Codes, Employees, and Equipment. The database schema has already been prepped with `procore_id` columns to support this enterprise-grade synchronization.

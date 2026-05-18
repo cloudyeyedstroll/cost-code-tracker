@@ -1,6 +1,32 @@
-__pycache__/
-*.db
-!job_costing_v7.db
+# Secrets and Environment Variables
 .env
-.venv/
+.env.*
+
+# Python Virtual Environments
 venv/
+.venv/
+env/
+
+# Python Cache
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# OS-specific Files
+.DS_Store
+Thumbs.db
+
+# Local Databases and Logs
+*.db
+*.sqlite3
+*.log
+!job_costing_v7.db
+
+# Application Specific Temp Directories
+/static/temp_uploads/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.swp

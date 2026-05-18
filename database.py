@@ -36,6 +36,10 @@ if not service_role_key:
     except Exception:
         pass
 
+if url: url = url.strip('"').strip("'").strip()
+if key: key = key.strip('"').strip("'").strip()
+if service_role_key: service_role_key = service_role_key.strip('"').strip("'").strip()
+
 supabase_init_error = None
 
 try:
@@ -83,6 +87,38 @@ def add_project(job_number, project_name, location):
         print(f"Error adding project: {e}")
         return False, str(e)
 
+def get_current_pay_period():
+    try:
+        res = supabase.table('payroll_settings').select('*').eq('id', 1).execute()
+        if res.data:
+            return res.data[0]['current_period_start'], res.data[0]['current_period_end']
+    except Exception as e:
+        print(f"Error fetching pay period: {e}")
+    
+    # Fallback range (rolling 14-day window)
+    end_date = pd.Timestamp.now().date()
+    start_date = end_date - pd.Timedelta(days=13)
+    return str(start_date), str(end_date)
+
+def update_current_pay_period(start_date, end_date):
+    try:
+        res = supabase.table('payroll_settings').select('id').eq('id', 1).execute()
+        if res.data:
+            supabase.table('payroll_settings').update({
+                "current_period_start": str(start_date),
+                "current_period_end": str(end_date)
+            }).eq('id', 1).execute()
+        else:
+            supabase.table('payroll_settings').insert({
+                "id": 1,
+                "current_period_start": str(start_date),
+                "current_period_end": str(end_date)
+            }).execute()
+        return True
+    except Exception as e:
+        print(f"Error updating pay period: {e}")
+        return False
+
 def get_employees():
     response = supabase.table('employees').select('id, first_name, last_name, role').execute()
     df = pd.DataFrame(response.data) if response.data else pd.DataFrame(columns=['id', 'first_name', 'last_name', 'role'])
@@ -90,19 +126,129 @@ def get_employees():
         df['full_name'] = df['first_name'] + ' ' + df['last_name']
     return df
 
-def get_equipment():
-    response = supabase.table('equipment').select('id, unit_number, make_model').execute()
-    df = pd.DataFrame(response.data) if response.data else pd.DataFrame(columns=['id', 'unit_number', 'make_model'])
-    if not df.empty:
-        df['display_name'] = df['unit_number'] + ' - ' + df['make_model']
-    return df
+def get_equipment(project_id=None):
+    try:
+        if project_id:
+            # Check if project has specific equipment mapped
+            mapped_res = supabase.table('project_equipment').select('equipment_id').eq('project_id', project_id).execute()
+            if mapped_res.data:
+                eq_ids = [r['equipment_id'] for r in mapped_res.data]
+                response = supabase.table('equipment').select('id, unit_number, make_model').in_('id', eq_ids).execute()
+            else:
+                # Fallback to all equipment
+                response = supabase.table('equipment').select('id, unit_number, make_model').execute()
+        else:
+            response = supabase.table('equipment').select('id, unit_number, make_model').execute()
+            
+        df = pd.DataFrame(response.data) if response.data else pd.DataFrame(columns=['id', 'unit_number', 'make_model'])
+        if not df.empty:
+            df['display_name'] = df['unit_number'] + ' - ' + df['make_model']
+        return df
+    except Exception as e:
+        print(f"Error fetching equipment: {e}")
+        return pd.DataFrame(columns=['id', 'unit_number', 'make_model', 'display_name'])
 
-def get_cost_codes():
-    response = supabase.table('cost_codes').select('id, code_number, description').execute()
-    df = pd.DataFrame(response.data) if response.data else pd.DataFrame(columns=['id', 'code_number', 'description'])
-    if not df.empty:
-        df['display_name'] = df['code_number'] + ' ' + df['description']
-    return df
+def get_master_fleet():
+    try:
+        response = supabase.table('equipment').select('*').order('unit_number').execute()
+        df = pd.DataFrame(response.data) if response.data else pd.DataFrame()
+        return df
+    except Exception as e:
+        print(f"Error fetching master fleet: {e}")
+        return pd.DataFrame()
+
+def insert_new_equipment(unit_number, make, model, starting_hours):
+    try:
+        supabase.table('equipment').insert({
+            "unit_number": unit_number,
+            "make": make,
+            "model": model,
+            "starting_hours": starting_hours
+        }).execute()
+        return True, "Equipment registered successfully."
+    except Exception as e:
+        print(f"Error inserting new equipment: {e}")
+        return False, "Failed to register equipment. Unit number may already exist."
+
+def delete_equipment(unit_number):
+    try:
+        supabase.table('equipment').delete().eq('unit_number', unit_number).execute()
+        return True, f"Equipment {unit_number} deleted successfully."
+    except Exception as e:
+        print(f"Error deleting equipment: {e}")
+        return False, f"Failed to delete equipment {unit_number}."
+
+def insert_single_cost_code(code, description):
+    try:
+        # Check if exists to emulate ON CONFLICT
+        existing = supabase.table('cost_codes').select('id').eq('code_number', code).execute()
+        if existing.data:
+            supabase.table('cost_codes').update({'description': description}).eq('code_number', code).execute()
+            return True, "Cost code updated successfully."
+        else:
+            supabase.table('cost_codes').insert({
+                "code_number": code,
+                "description": description
+            }).execute()
+            return True, "Cost code created successfully."
+    except Exception as e:
+        print(f"Error inserting cost code: {e}")
+        return False, str(e)
+
+def bulk_insert_cost_codes(dataframe_payload):
+    try:
+        if dataframe_payload.empty:
+            return False, "Empty dataframe provided."
+        
+        # Ensure correct column names
+        if 'code' not in dataframe_payload.columns or 'description' not in dataframe_payload.columns:
+            return False, "CSV must contain 'code' and 'description' columns."
+        
+        # Drop duplicates in payload
+        df_clean = dataframe_payload.drop_duplicates(subset=['code'])
+        
+        # Get existing codes
+        existing_res = supabase.table('cost_codes').select('code_number').execute()
+        existing_codes = set([r['code_number'] for r in existing_res.data]) if existing_res.data else set()
+        
+        # Filter new codes
+        new_records = []
+        for _, row in df_clean.iterrows():
+            if str(row['code']).strip() not in existing_codes:
+                new_records.append({
+                    "code_number": str(row['code']).strip(),
+                    "description": str(row['description']).strip()
+                })
+        
+        if new_records:
+            supabase.table('cost_codes').insert(new_records).execute()
+            
+        return True, f"Successfully imported {len(new_records)} new cost codes."
+    except Exception as e:
+        print(f"Error bulk inserting cost codes: {e}")
+        return False, str(e)
+
+def get_cost_codes(project_id=None):
+    try:
+        if project_id:
+            # Check if project has specific cost codes mapped
+            mapped_res = supabase.table('project_cost_codes').select('cost_code_id').eq('project_id', project_id).execute()
+            if mapped_res.data:
+                cc_ids = [r['cost_code_id'] for r in mapped_res.data]
+                response = supabase.table('cost_codes').select('id, code_number, description').in_('id', cc_ids).execute()
+            else:
+                # Fallback to all cost codes
+                response = supabase.table('cost_codes').select('id, code_number, description').execute()
+        else:
+            response = supabase.table('cost_codes').select('id, code_number, description').execute()
+            
+        df = pd.DataFrame(response.data) if response.data else pd.DataFrame(columns=['id', 'code_number', 'description'])
+        if not df.empty:
+            df['display_name'] = df['code_number'] + ' ' + df['description']
+        return df
+    except Exception as e:
+        print(f"Error fetching cost codes: {e}")
+        return pd.DataFrame(columns=['id', 'code_number', 'description', 'display_name'])
 
 def get_all_job_titles():
     response = supabase.table('job_titles').select('id, title_name, permission_tier').execute()
@@ -130,15 +276,32 @@ def log_labor(date, project_id, employee_id, cost_code_id, hours_worked, work_de
         "work_description": work_description
     }).execute()
 
-def log_equipment(date, project_id, employee_id, equipment_id, cost_code_id, hours_used):
-    supabase.table('equipment_logs').insert({
+def log_equipment(date, project_id, employee_id, equipment_id, cost_code_id, hours_used, start_meter=None, end_meter=None, calculated_runtime=None):
+    data = {
         "date": str(date),
         "project_id": project_id,
         "employee_id": employee_id,
         "equipment_id": equipment_id,
         "cost_code_id": cost_code_id,
         "hours_used": hours_used
-    }).execute()
+    }
+    if start_meter is not None:
+        data["start_meter"] = start_meter
+    if end_meter is not None:
+        data["end_meter"] = end_meter
+    if calculated_runtime is not None:
+        data["calculated_runtime"] = calculated_runtime
+        
+    supabase.table('equipment_logs').insert(data).execute()
+
+def get_latest_equipment_meter(equipment_id):
+    try:
+        response = supabase.table('equipment_logs').select('end_meter').eq('equipment_id', equipment_id).order('date', desc=True).order('id', desc=True).limit(1).execute()
+        if response.data and response.data[0].get('end_meter') is not None:
+            return response.data[0]['end_meter']
+    except Exception as e:
+        print(f"Error fetching latest equipment meter: {e}")
+    return 0.0
 
 def get_employee_role(employee_id):
     response = supabase.table('employees').select('role').eq('id', employee_id).execute()
@@ -392,3 +555,250 @@ def get_signed_force_accounts():
     df['Project'] = df['Project'].str.strip()
     return df
 
+def get_employee_timecard_summary(employee_id, start_date, end_date):
+    try:
+        res = supabase.table('labor_logs').select('hours_worked, status').eq('employee_id', employee_id).gte('date', start_date).lte('date', end_date).execute()
+        df = pd.DataFrame(res.data) if res.data else pd.DataFrame(columns=['hours_worked', 'status'])
+        if df.empty:
+            return {"Approved": 0.0, "Pending": 0.0}
+        
+        summary = df.groupby('status')['hours_worked'].sum().to_dict()
+        return {
+            "Approved": summary.get('Approved', 0.0),
+            "Pending": summary.get('Pending', 0.0)
+        }
+    except Exception as e:
+        print(f"Error fetching timecard summary: {e}")
+        return {"Approved": 0.0, "Pending": 0.0}
+
+
+def get_latest_user_logs(employee_id):
+    try:
+        # Fetch the latest labor log for the user
+        labor_res = supabase.table('labor_logs').select('project_id, cost_code_id').eq('employee_id', employee_id).order('date', desc=True).order('id', desc=True).limit(1).execute()
+        
+        # Fetch the latest equipment log for the user
+        equipment_res = supabase.table('equipment_logs').select('equipment_id').eq('employee_id', employee_id).order('date', desc=True).order('id', desc=True).limit(1).execute()
+        
+        latest_project_id = None
+        latest_cost_code_id = None
+        latest_equipment_id = None
+        
+        if labor_res.data:
+            latest_project_id = labor_res.data[0]['project_id']
+            latest_cost_code_id = labor_res.data[0]['cost_code_id']
+            
+        if equipment_res.data:
+            latest_equipment_id = equipment_res.data[0]['equipment_id']
+            # If labor_res didn't have a project_id, but equipment_res does, we could grab it, but equipment_logs has project_id as well.
+            # Let's fetch project_id from equipment logs if we didn't get it from labor logs
+            if not latest_project_id:
+                # fetch project_id for equipment log too to be safe
+                eq_proj_res = supabase.table('equipment_logs').select('project_id').eq('employee_id', employee_id).order('date', desc=True).order('id', desc=True).limit(1).execute()
+                if eq_proj_res.data:
+                    latest_project_id = eq_proj_res.data[0]['project_id']
+
+        return {
+            "project_id": latest_project_id,
+            "cost_code_id": latest_cost_code_id,
+            "equipment_id": latest_equipment_id
+        }
+    except Exception as e:
+        print(f"Error fetching latest logs: {e}")
+        return {
+            "project_id": None,
+            "cost_code_id": None,
+            "equipment_id": None
+        }
+
+def get_integration_settings():
+    try:
+        res = supabase.table('integration_settings').select('*').limit(1).execute()
+        if res.data:
+            return res.data[0]
+        return None
+    except Exception as e:
+        print(f"Error fetching integration settings: {e}")
+        return None
+
+def save_integration_settings(procore_client_id, procore_client_secret, vision_ai_key, openai_api_key=""):
+    try:
+        existing = get_integration_settings()
+        data = {
+            "procore_client_id": procore_client_id,
+            "procore_client_secret": procore_client_secret,
+            "vision_ai_key": vision_ai_key,
+            "openai_api_key": openai_api_key
+        }
+        if existing:
+            supabase.table('integration_settings').update(data).eq('id', existing['id']).execute()
+        else:
+            supabase.table('integration_settings').insert(data).execute()
+        return True
+    except Exception as e:
+        return False
+
+def upload_company_logo(file_bytes):
+    try:
+        supabase.storage.from_("company-assets").upload("logo.png", file_bytes, file_options={"upsert": "true", "content-type": "image/png"})
+        return True
+    except Exception as e:
+        print(f"Error uploading logo: {e}")
+        return False
+
+def get_company_logo():
+    try:
+        return supabase.storage.from_("company-assets").download("logo.png")
+    except Exception as e:
+        return None
+
+def log_material(project_id, user_id, cost_code_id, date, log_type, supplier, material_description, quantity, unit, scanned_ticket_url=None):
+    try:
+        supabase.table('material_logs').insert({
+            "project_id": project_id,
+            "user_id": user_id,
+            "cost_code_id": cost_code_id,
+            "date": str(date),
+            "log_type": log_type,
+            "supplier": supplier,
+            "material_description": material_description,
+            "quantity": quantity,
+            "unit": unit,
+            "scanned_ticket_url": scanned_ticket_url
+        }).execute()
+        return True
+    except Exception as e:
+        print(f"Error logging material: {e}")
+        return False
+
+def get_daily_material_logs(project_id, target_date):
+    try:
+        # We assume there's a cost_codes relation if cost_code_id is not null
+        res = supabase.table('material_logs').select('*, cost_codes(code_number, description), employees!user_id(first_name, last_name)').eq('project_id', project_id).eq('date', str(target_date)).execute()
+        return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+    except Exception as e:
+        print(f"Error fetching daily material logs: {e}")
+        return pd.DataFrame()
+
+def log_subcontractor(project_id, user_id, cost_code_id, date, company_name, scope_of_work, hours_worked, comments="", ticket_number=None, scanned_ticket_url=None):
+    try:
+        supabase.table('subcontractor_logs').insert({
+            "project_id": project_id,
+            "user_id": user_id,
+            "cost_code_id": cost_code_id,
+            "date": str(date),
+            "company_name": company_name,
+            "scope_of_work": scope_of_work,
+            "hours_worked": hours_worked,
+            "comments": comments,
+            "ticket_number": ticket_number,
+            "scanned_ticket_url": scanned_ticket_url
+        }).execute()
+        return True
+    except Exception as e:
+        print(f"Error logging subcontractor: {e}")
+        return False
+
+def get_daily_subcontractor_logs(project_id, target_date):
+    try:
+        res = supabase.table('subcontractor_logs').select('*, cost_codes(code_number, description), employees!user_id(first_name, last_name)').eq('project_id', project_id).eq('date', str(target_date)).execute()
+        return pd.DataFrame(res.data) if res.data else pd.DataFrame()
+    except Exception as e:
+        print(f"Error fetching daily subcontractor logs: {e}")
+        return pd.DataFrame()
+
+def upload_ticket_image(file_bytes, filename):
+    try:
+        # Generate a unique path to avoid collisions
+        unique_filename = f"{secrets.token_hex(8)}_{filename}"
+        res = supabase.storage.from_("tickets").upload(unique_filename, file_bytes, file_options={"upsert": "false"})
+        # Get public URL
+        public_url = supabase.storage.from_("tickets").get_public_url(unique_filename)
+        return public_url
+    except Exception as e:
+        print(f"Error uploading ticket: {e}")
+        return None
+
+
+def get_all_material_logs():
+    try:
+        res = supabase.table('material_logs').select('*, projects(job_number, project_name), cost_codes(code_number, description), employees!user_id(first_name, last_name)').execute()
+        df = pd.DataFrame(res.data) if res.data else pd.DataFrame()
+        if not df.empty:
+            # Flatten relations
+            df['Project'] = df['projects'].apply(lambda x: f"{x.get('job_number','')} {x.get('project_name','')}").str.strip() if 'projects' in df else ''
+            df['Cost Code'] = df['cost_codes'].apply(lambda x: f"{x.get('code_number','')} {x.get('description','')}" if x else '') if 'cost_codes' in df else ''
+            df['Logged By'] = df['employees'].apply(lambda x: f"{x.get('first_name','')} {x.get('last_name','')}" if x else '') if 'employees' in df else ''
+            df['Date'] = df['date']
+            df['Log Type'] = df['log_type']
+            df['Supplier'] = df['supplier']
+            df['Description'] = df['material_description']
+            df['Qty'] = df['quantity'].astype(str) + ' ' + df['unit'].astype(str)
+            df['Ticket URL'] = df['scanned_ticket_url']
+            return df[['Date', 'Project', 'Logged By', 'Cost Code', 'Log Type', 'Supplier', 'Description', 'Qty', 'Ticket URL']].sort_values('Date', ascending=False)
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"Error fetching all material logs: {e}")
+        return pd.DataFrame()
+
+def get_all_subcontractor_logs():
+    try:
+        res = supabase.table('subcontractor_logs').select('*, projects(job_number, project_name), cost_codes(code_number, description), employees!user_id(first_name, last_name)').execute()
+        df = pd.DataFrame(res.data) if res.data else pd.DataFrame()
+        if not df.empty:
+            df['Project'] = df['projects'].apply(lambda x: f"{x.get('job_number','')} {x.get('project_name','')}").str.strip() if 'projects' in df else ''
+            df['Cost Code'] = df['cost_codes'].apply(lambda x: f"{x.get('code_number','')} {x.get('description','')}" if x else '') if 'cost_codes' in df else ''
+            df['Logged By'] = df['employees'].apply(lambda x: f"{x.get('first_name','')} {x.get('last_name','')}" if x else '') if 'employees' in df else ''
+            df['Date'] = df['date']
+            df['Company'] = df['company_name']
+            df['Ticket #'] = df['ticket_number']
+            df['Scope'] = df['scope_of_work']
+            df['Hours'] = df['hours_worked']
+            df['Comments'] = df['comments']
+            df['Ticket URL'] = df['scanned_ticket_url']
+            return df[['Date', 'Project', 'Logged By', 'Cost Code', 'Company', 'Ticket #', 'Scope', 'Hours', 'Comments', 'Ticket URL']].sort_values('Date', ascending=False)
+        return pd.DataFrame()
+    except Exception as e:
+        print(f"Error fetching all subcontractor logs: {e}")
+        return pd.DataFrame()
+
+def get_daily_report_data(project_id, target_date):
+    try:
+        labor_res = supabase.table('labor_logs').select('*, employees(first_name, last_name, role), cost_codes(code, description)').eq('project_id', project_id).eq('date', str(target_date)).execute()
+        labor_data = labor_res.data if labor_res.data else []
+
+        eq_res = supabase.table('equipment_logs').select('*, equipment(make, model, unit_number), cost_codes(code, description)').eq('project_id', project_id).eq('date', str(target_date)).execute()
+        eq_data = eq_res.data if eq_res.data else []
+        
+        mat_res = supabase.table('material_logs').select('*, cost_codes(code, description)').eq('project_id', project_id).eq('date', str(target_date)).execute()
+        mat_data = mat_res.data if mat_res.data else []
+
+        sub_res = supabase.table('subcontractor_logs').select('*, cost_codes(code, description)').eq('project_id', project_id).eq('date', str(target_date)).execute()
+        sub_data = sub_res.data if sub_res.data else []
+
+        proj_res = supabase.table('projects').select('*').eq('id', project_id).execute()
+        project_data = proj_res.data[0] if proj_res.data else None
+
+        return {
+            "project": project_data,
+            "labor_logs": labor_data,
+            "equipment_logs": eq_data,
+            "material_logs": mat_data,
+            "subcontractor_logs": sub_data
+        }
+    except Exception as e:
+        print(f"Error fetching daily report data: {e}")
+        return None
+
+def send_password_reset_email(email):
+    if supabase is None:
+        return f"Database client not initialized. Error: {supabase_init_error}"
+    try:
+        # Note: the redirect_to URL should match your deployed app URL.
+        supabase.auth.reset_password_for_email(
+            email, 
+            options={"redirect_to": "https://cost-code-tracker-94816924591.us-central1.run.app/"}
+        )
+        return True
+    except Exception as e:
+        return str(e)

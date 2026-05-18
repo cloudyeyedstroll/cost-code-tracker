@@ -1,5 +1,8 @@
 streamlit
 pandas
-supabase==2.6.0
+supabase>=2.30.0
 python-dotenv
 streamlit-drawable-canvas
+fpdf2
+google-genai
+pydantic

@@ -1,0 +1,6 @@
+*.db
+*.db-journal
+*.sqlite3
+*.xlsx
+**/__pycache__/
+supabase/.temp/
