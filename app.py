@@ -135,7 +135,7 @@ if 'logged_in_user_name' not in st.session_state:
 if 'logged_in_user_role' not in st.session_state:
     st.session_state.logged_in_user_role = None
 
-st.title("Construction Job Costing")
+st.title("Construction Job Costing - v1.0.1 (CD Test)")
 
 if st.session_state.logged_in_user_id is None:
     st.header("Employee Login")
